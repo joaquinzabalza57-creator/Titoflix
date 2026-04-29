@@ -382,77 +382,6 @@
       padding: 20px;
     }
 
-    .video-tools {
-      max-width: 420px;
-      margin-bottom: 16px;
-    }
-
-    .video-filter {
-      width: 100%;
-      padding: 13px 14px;
-      background: #181818;
-      border: 1px solid #343434;
-      border-radius: 6px;
-      color: white;
-      font-size: 15px;
-      outline: none;
-    }
-
-    .video-filter:focus {
-      border-color: #ce2b37;
-      box-shadow: 0 0 0 3px rgba(206, 43, 55, 0.18);
-    }
-
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-    }
-
-    .video-card {
-      min-height: 120px;
-      padding: 18px;
-      border-radius: 8px;
-      background:
-        linear-gradient(145deg, rgba(0, 146, 70, 0.18), rgba(8, 8, 8, 0) 38%),
-        linear-gradient(135deg, #202020, #101010);
-      border: 1px solid #303030;
-      color: white;
-      text-align: left;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 18px;
-    }
-
-    .video-card:hover,
-    .video-card:focus-visible {
-      border-color: #ffffff;
-      transform: translateY(-3px);
-      background:
-        linear-gradient(145deg, rgba(0, 146, 70, 0.25), rgba(206, 43, 55, 0.18)),
-        linear-gradient(135deg, #262626, #121212);
-    }
-
-    .video-title {
-      font-size: 18px;
-      line-height: 1.25;
-    }
-
-    .video-action {
-      color: #bdbdbd;
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-    .empty-videos {
-      color: #999;
-      padding: 18px;
-      border: 1px solid #303030;
-      border-radius: 8px;
-      background: #151515;
-    }
-
     .backend-box {
       max-width: 900px;
       background: #151515;
@@ -461,6 +390,48 @@
       border-radius: 8px;
       color: #ddd;
       line-height: 1.5;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .video-card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      transition: 0.2s;
+    }
+
+    .video-card:hover {
+      background: #252525;
+    }
+
+    .video-link {
+      color: #ccc;
+      font-size: 16px;
+      text-decoration: none;
+      display: block;
+    }
+
+    .video-link:hover {
+      color: #e50914;
+    }
+
+    .empty-state {
+      background: #151515;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 40px 20px;
+      text-align: center;
+      color: #888;
+    }
+
+    .empty-state p {
+      font-size: 16px;
     }
 
     @media (max-width: 800px) {
@@ -493,10 +464,6 @@
 
       .profile-label {
         display: none;
-      }
-
-      .video-tools {
-        max-width: none;
       }
     }
   </style>
@@ -585,6 +552,24 @@
 
     <main>
       <section class="section">
+        <h2>Videos de ejemplo</h2>
+        <div class="video-grid">
+          <div class="video-card">
+            <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" class="video-link">Video de ejemplo 1</a>
+          </div>
+          <div class="video-card">
+            <a href="https://www.youtube.com/watch?v=jNQXAC9IVRw" target="_blank" class="video-link">Video de ejemplo 2</a>
+          </div>
+          <div class="video-card">
+            <a href="https://www.youtube.com/watch?v=9bZkp7q19f0" target="_blank" class="video-link">Video de ejemplo 3</a>
+          </div>
+          <div class="video-card">
+            <a href="https://www.youtube.com/watch?v=5EouEAo9wy0&list=RD5EouEAo9wy0&start_radio=1&pp=ygUIbWUgbGxhbWGgBwE%3D" target="_blank" class="video-link">Video de ejemplo 4</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
         <h2>Contenido principal</h2>
         <div class="placeholder-grid">
           <div class="placeholder-card">Aca van las cards que lleguen desde Python</div>
@@ -595,11 +580,10 @@
       </section>
 
       <section class="section">
-        <h2>Videos disponibles</h2>
-        <div class="video-tools">
-          <input id="videoFilter" class="video-filter" type="search" placeholder="Filtrar por titulo" autocomplete="off" />
+        <h2>Peliculas y Videos</h2>
+        <div class="empty-state">
+          <p>No hay peliculas/videos/series para ver en este momento. Intentar mas tarde.</p>
         </div>
-        <div id="videosContainer" class="video-grid"></div>
       </section>
 
       <section class="section">
@@ -620,61 +604,11 @@
       contrasena: "1234"
     };
 
-    const videos = [
-      { titulo: "Video 1", link: "https://youtube.com/..." },
-      { titulo: "Video 2", link: "https://youtube.com/..." },
-      { titulo: "Trailer destacado", link: "https://youtube.com/..." },
-      { titulo: "Recomendado para invitado", link: "https://youtube.com/..." }
-    ];
-
     const loginForm = document.getElementById("loginForm");
     const loginScreen = document.getElementById("loginScreen");
     const profileScreen = document.getElementById("profileScreen");
     const app = document.getElementById("app");
     const errorMessage = document.getElementById("errorMessage");
-    const videosContainer = document.getElementById("videosContainer");
-    const videoFilter = document.getElementById("videoFilter");
-
-    function mostrarVideos(listaVideos) {
-      videosContainer.innerHTML = "";
-
-      if (listaVideos.length === 0) {
-        videosContainer.innerHTML = '<p class="empty-videos">No se encontraron videos con ese titulo.</p>';
-        return;
-      }
-
-      listaVideos.forEach(function(video) {
-        const card = document.createElement("button");
-        const titulo = document.createElement("span");
-        const accion = document.createElement("span");
-
-        card.className = "video-card";
-        card.type = "button";
-        titulo.className = "video-title";
-        titulo.textContent = video.titulo;
-        accion.className = "video-action";
-        accion.textContent = "Abrir en nueva pestana";
-
-        card.addEventListener("click", function() {
-          window.open(video.link, "_blank");
-        });
-
-        card.appendChild(titulo);
-        card.appendChild(accion);
-        videosContainer.appendChild(card);
-      });
-    }
-
-    videoFilter.addEventListener("input", function() {
-      const busqueda = videoFilter.value.trim().toLowerCase();
-      const videosFiltrados = videos.filter(function(video) {
-        return video.titulo.toLowerCase().includes(busqueda);
-      });
-
-      mostrarVideos(videosFiltrados);
-    });
-
-    mostrarVideos(videos);
 
     loginForm.addEventListener("submit", function(event) {
       event.preventDefault();
