@@ -184,3 +184,133 @@ class EpisodioService:
     def list_by_temporada(self, temporada_id: int) -> list[EpisodioResponseDTO]:
         episodios = self.episodio_repo.list_by_temporada(temporada_id)
         return [to_episodio_response(episodio) for episodio in episodios]
+
+class VistaService:
+    def __init__(self, db: Session):
+        self.perfil_repo = PerfilRepository(db)
+        self.episodio_repo = EpisodioRepository(db)
+        self.vista_repo = VistaRepository(db)
+
+    def create_or_update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        perfil = self.perfil_repo.find_by_id(dto.perfil_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        episodio = self.episodio_repo.find_by_id(dto.episodio_id)
+
+        if not episodio:
+            raise NotFoundError("Episodio no encontrado")
+
+        contenido = episodio.temporada.contenido
+
+        if perfil.es_infantil and contenido.clasificacion_edad != "ATP":
+            raise ForbiddenError("El perfil infantil no puede ver este contenido")
+
+        duracion_segundos = episodio.duracion_min * 60
+
+        if dto.segundos_vistos > duracion_segundos:
+            raise ConflictError("Los segundos vistos superan la duración")
+
+        terminado = dto.terminado or dto.segundos_vistos >= duracion_segundos * 0.9
+
+        vista = self.vista_repo.create_or_update(
+            perfil_id=dto.perfil_id,
+            episodio_id=dto.episodio_id,
+            segundos_vistos=dto.segundos_vistos,
+            terminado=terminado,
+        )
+
+        return to_vista_response(vista)
+
+    def continuar_viendo(self, perfil_id: int) -> list[VistaResponseDTO]:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        vistas = self.vista_repo.continuar_viendo(perfil_id)[:10]
+        return to_vista_response_list(vistas)
+
+
+class MiListaService:
+    def __init__(self, db: Session):
+        self.perfil_repo = PerfilRepository(db)
+        self.contenido_repo = ContenidoRepository(db)
+
+    def add(self, perfil_id: int, contenido_id: int) -> list[ContenidoResponseDTO]:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+        contenido = self.contenido_repo.find_by_id(contenido_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        if not contenido:
+            raise NotFoundError("Contenido no encontrado")
+
+        if perfil.es_infantil and contenido.clasificacion_edad != "ATP":
+            raise ForbiddenError("El perfil infantil no puede agregar este contenido")
+
+        perfil = self.perfil_repo.add_to_mi_lista(perfil_id, contenido_id)
+        return to_contenido_response_list(perfil.mi_lista)
+
+    def remove(self, perfil_id: int, contenido_id: int) -> list[ContenidoResponseDTO]:
+        perfil = self.perfil_repo.remove_from_mi_lista(perfil_id, contenido_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        return to_contenido_response_list(perfil.mi_lista)
+
+    def list(self, perfil_id: int) -> list[ContenidoResponseDTO]:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        contenidos = self.perfil_repo.get_mi_lista(perfil_id)
+
+        if perfil.es_infantil:
+            contenidos = [
+                contenido for contenido in contenidos
+                if contenido.clasificacion_edad == "ATP"
+            ]
+
+        return to_contenido_response_list(contenidos)
+
+
+class CalificacionService:
+    def __init__(self, db: Session):
+        self.perfil_repo = PerfilRepository(db)
+        self.contenido_repo = ContenidoRepository(db)
+        self.calificacion_repo = CalificacionRepository(db)
+        self.vista_repo = VistaRepository(db)
+
+    def create_or_update(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        perfil = self.perfil_repo.find_by_id(dto.perfil_id)
+
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        contenido = self.contenido_repo.find_by_id(dto.contenido_id)
+
+        if not contenido:
+            raise NotFoundError("Contenido no encontrado")
+
+        vistas = self.vista_repo.list_by_perfil(dto.perfil_id)
+        empezo_contenido = any(
+            vista.episodio.temporada.contenido_id == dto.contenido_id
+            and vista.segundos_vistos > 0
+            for vista in vistas
+        )
+
+        if not empezo_contenido:
+            raise ConflictError("Solo se puede calificar contenido empezado")
+
+        calificacion = self.calificacion_repo.create_or_update(
+            perfil_id=dto.perfil_id,
+            contenido_id=dto.contenido_id,
+            puntaje=dto.puntaje,
+        )
+
+        return to_calificacion_response(calificacion)
