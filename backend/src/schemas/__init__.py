@@ -1,5 +1,5 @@
-from .auth_schema import LoginSchema, PinSchema, TokenSchema
-from .product_schema import (
+from .auth_schema import LoginSchema, PinSchema, TokenSchema  # Importa schemas relacionados a autenticación
+from .product_schema import (                                 # Importa schemas relacionados a contenido/productos
     CalificacionSchema,
     ContenidoSchema,
     CreateCalificacionSchema,
@@ -12,7 +12,7 @@ from .product_schema import (
     UpdateContenidoSchema,
     VistaSchema,
 )
-from .user_schema import (
+from .user_schema import (                                    # Importa schemas relacionados a usuarios
     CreateCuentaSchema,
     CreatePerfilSchema,
     CreateUserSchema,
@@ -23,13 +23,14 @@ from .user_schema import (
     UpdateUserSchema,
 )
 
-__all__ = [
-    "LoginSchema", "PinSchema", "TokenSchema",
-    "CreateUserSchema", "UpdateUserSchema",
-    "CreateCuentaSchema", "UpdateCuentaSchema", "CuentaSchema",
-    "CreatePerfilSchema", "UpdatePerfilSchema", "PerfilSchema",
-    "GeneroSchema", "CreateContenidoSchema", "UpdateContenidoSchema",
-    "ContenidoSchema", "CreateTemporadaSchema", "CreateEpisodioSchema",
-    "CreateVistaSchema", "VistaSchema", "CreateCalificacionSchema",
-    "CalificacionSchema", "MiListaSchema",
+__all__ = [                                                   # Define qué se exporta al hacer "from module import *"
+    "LoginSchema", "PinSchema", "TokenSchema",                # Schemas de autenticación
+    "CreateUserSchema", "UpdateUserSchema",                  # Schemas de usuario
+    "CreateCuentaSchema", "UpdateCuentaSchema", "CuentaSchema",  # Schemas de cuenta
+    "CreatePerfilSchema", "UpdatePerfilSchema", "PerfilSchema",  # Schemas de perfil
+    "GeneroSchema", "CreateContenidoSchema", "UpdateContenidoSchema",  # Schemas de contenido
+    "ContenidoSchema", "CreateTemporadaSchema", "CreateEpisodioSchema",  # Más schemas de contenido
+    "CreateVistaSchema", "VistaSchema",                      # Schemas de vistas
+    "CreateCalificacionSchema", "CalificacionSchema",        # Schemas de calificaciones
+    "MiListaSchema",                                        # Schema de lista personalizada
 ]
