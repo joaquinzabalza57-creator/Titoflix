@@ -15,7 +15,7 @@ def create_user(payload: CreateUserSchema, db: Session = Depends(get_db)):
     dto = CreateUserDTO(**payload.model_dump())
     return UserService(db).create(dto)
 
-
+"""
 @router.get("/{user_id}", response_model=UserResponseDTO)
 def get_user(user_id: int, db: Session = Depends(get_db)):
     # TODO: llamar a UserService(db).get_by_id(user_id) y devolver el resultado
@@ -38,3 +38,4 @@ def update_user(user_id: int, db: Session = Depends(get_db)):
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     # TODO: llamar a UserService(db).delete(user_id)
     ...
+"""
