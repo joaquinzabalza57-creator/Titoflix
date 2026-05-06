@@ -1,57 +1,15 @@
 from sqlalchemy.orm import Session
 
 from src.db.models import Contenido, Cuenta, Perfil
-from src.db.models.user_model import User
-
-
-class UserRepository:
-    def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
-        self.db = db
-
-    def create(self, email: str, password_hash: str, age: int) -> User:  # Crea y persiste un nuevo usuario
-        user = User(email=email, password_hash=password_hash, age=age)
-        self.db.add(user)
-        self.db.commit()                                                 # Guarda cambios en la base de datos
-        self.db.refresh(user)                                            # Actualiza la instancia con datos de DB
-        return user
-
-    def find_by_id(self, user_id: int) -> User | None:                   # Busca usuario por ID
-        return self.db.query(User).filter(User.id == user_id).first()
-
-    def find_by_email(self, email: str) -> User | None:                  # Busca usuario por email
-        return self.db.query(User).filter(User.email == email).first()
-
-    def list_all(self) -> list[User]:                                    # Obtiene todos los registros de usuarios
-        return self.db.query(User).all()
-
-    def update(self, user_id: int, **fields) -> User | None:             # Actualiza campos dinámicamente
-        user = self.find_by_id(user_id)                                  # Verifica existencia
-        if not user:
-            return None
-
-        for key, value in fields.items():                                # Aplica cambios
-            setattr(user, key, value)
-
-        self.db.commit()                                                 # Persiste cambios
-        self.db.refresh(user)
-        return user
-
-    def delete(self, user_id: int) -> bool:                              # Elimina un usuario por ID
-        user = self.find_by_id(user_id)
-        if not user:
-            return False
-
-        self.db.delete(user)                                             # Elimina registro
-        self.db.commit()                                                 # Confirma eliminación
-        return True
+from src.db.models.user_model import Cuenta, Perfil
 
 
 class CuentaRepository:
     def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
         self.db = db
 
-    def create(self, email: str, plan: str, pin: str | None = None) -> Cuenta: # Crea y persiste una nueva cuenta
-        cuenta = Cuenta(email=email, plan=plan, pin=pin)
+    def create(self, email: str, password_hash: str, plan: str, pin: str | None = None) -> Cuenta: # Crea y persiste una nueva cuenta
+        cuenta = Cuenta(email=email, password_hash=password_hash, plan=plan, pin=pin)
         self.db.add(cuenta)
         self.db.commit()                                                 # Guarda cambios en la base de datos
         self.db.refresh(cuenta)                                          # Actualiza la instancia con datos de DB

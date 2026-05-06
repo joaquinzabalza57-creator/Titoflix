@@ -6,11 +6,10 @@ from .product_repository import (
     TemporadaRepository,             # Repositorio de Temporadas
     VistaRepository,                 # Repositorio de Vistas
 )
-from .user_repository import CuentaRepository, PerfilRepository, UserRepository
+from .user_repository import CuentaRepository, PerfilRepository
 # Repositorio de Cuentas, Perfiles y Usuarios
 
-__all__ = [
-    "UserRepository",                # Exporta Repositorio de Usuarios
+__all__ = [               # Exporta Repositorio de Usuarios
     "CuentaRepository",              # Exporta Repositorio de Cuentas
     "PerfilRepository",              # Exporta Repositorio de Perfiles
     "GeneroRepository",              # Exporta Repositorio de Géneros

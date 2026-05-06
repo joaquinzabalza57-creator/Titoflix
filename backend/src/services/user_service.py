@@ -19,6 +19,7 @@ from src.repositories.user_repository import CuentaRepository, PerfilRepository
 # Repositorio para Cuentas y para Perfiles
 
 from src.utils.errors import ConflictError, NotFoundError    # Importa excepciones personalizadas
+from src.utils.hash import hash_password
 
 
 PLAN_LIMITS = {                                      # Define los límites de perfiles permitidos por plan
@@ -37,9 +38,12 @@ class CuentaService:                                            # Servicio para 
 
         if existing:                                            # Si ya existe, lanza error de conflicto
             raise ConflictError("Ya existe una cuenta con ese email")
+        
+        password_hash = hash_password(dto.password)
 
         cuenta = self.cuenta_repo.create(                       # Persiste la nueva cuenta
             email=dto.email,
+            password_hash=password_hash,
             plan=dto.plan,
             pin=dto.pin,
         )
@@ -60,6 +64,9 @@ class CuentaService:                                            # Servicio para 
 
     def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO: # Actualiza datos de una cuenta
         fields = dto.model_dump(exclude_unset=True)             # Extrae solo los campos enviados
+
+        if "password" in fields:
+            fields["password_hash"] = hash_password(fields.pop("password"))
 
         cuenta = self.cuenta_repo.update(cuenta_id, **fields)   # Realiza la actualización
 

@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import jwt
+from jose import JWTError, jwt
 
 from src.config.env import settings
 from src.utils.errors import UnauthorizedError
 
 
-ALGORITHM = "HS256"
+ALGORITHM = settings.JWT_ALGORITHM
 
 
 def create_access_token(
@@ -15,7 +15,7 @@ def create_access_token(
     expires_delta: timedelta | None = None,
 ) -> str:
     expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
     data = payload.copy()
@@ -35,7 +35,5 @@ def decode_access_token(token: str) -> dict[str, Any]:
             settings.JWT_SECRET,
             algorithms=[ALGORITHM],
         )
-    except jwt.ExpiredSignatureError:
-        raise UnauthorizedError("Token expirado")
-    except jwt.InvalidTokenError:
-        raise UnauthorizedError("Token inválido")
+    except JWTError:
+        raise UnauthorizedError("Token inválido o expirado")

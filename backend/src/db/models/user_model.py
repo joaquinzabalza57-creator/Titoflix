@@ -10,6 +10,7 @@ class Cuenta(Base):                                           # Modelo de datos 
 
     id = Column(Integer, primary_key=True)                    # Identificador único de la cuenta (PK)
     email = Column(String, unique=True, nullable=False)       # Email único para inicio de sesión
+    password_hash = Column(String, nullable=False)
     plan = Column(String, nullable=False)                     # Tipo de plan suscrito (ej. básico, premium)
     pin = Column(String, nullable=True)                       # Código PIN opcional para acceso
     fecha_alta = Column(DateTime, server_default=func.now())  # Fecha y hora de creación automática

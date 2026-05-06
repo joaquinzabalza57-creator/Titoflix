@@ -21,12 +21,14 @@ class UpdateUserSchema(BaseModel):
 
 class CreateCuentaSchema(BaseModel):
     email: EmailStr                              # Email válido (validado automáticamente)
+    password: str = Field(min_length=8)
     plan: PlanType                               # Tipo de plan (basico, estandar, premium)
     pin: str | None = Field(default=None, min_length=4, max_length=4)  # PIN opcional de exactamente 4 caracteres
 
 
 class UpdateCuentaSchema(BaseModel):
     email: EmailStr | None = None                 # Email opcional (solo si se quiere actualizar)
+    password: str | None = Field(default=None, min_length=8)
     plan: PlanType | None = None                  # Plan opcional (basico, estandar, premium)
     pin: str | None = Field(default=None, min_length=4, max_length=4)  # PIN opcional de 4 caracteres
 

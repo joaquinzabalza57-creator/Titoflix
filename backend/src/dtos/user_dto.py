@@ -24,12 +24,14 @@ class UserResponseDTO(BaseModel):
 
 class CreateCuentaDTO(BaseModel):
     email: str                                   # Email del usuario (obligatorio)
+    password: str
     plan: str                                    # Tipo de plan (ej: basico, estandar, premium)
     pin: str | None = None                       # PIN opcional de 4 dígitos
 
 
 class UpdateCuentaDTO(BaseModel):
     email: str | None = None                     # Email opcional para actualizar
+    password: str | None = None                  # Contraseña opcional para actualizar
     plan: str | None = None                      # Plan opcional para actualizar
     pin: str | None = None                       # PIN opcional para actualizar
 
