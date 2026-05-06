@@ -5,44 +5,44 @@ from sqlalchemy.sql import func
 from src.db.connection import Base
 
 
-class Cuenta(Base):
-    __tablename__ = "cuentas"
+class Cuenta(Base):                                           # Modelo de datos para Cuenta
+    __tablename__ = "cuentas"                                 # Define el nombre de la tabla en BD
 
-    id = Column(Integer, primary_key=True)
-    email = Column(String, unique=True, nullable=False)
-    plan = Column(String, nullable=False)
-    pin = Column(String, nullable=True)
-    fecha_alta = Column(DateTime, server_default=func.now())
+    id = Column(Integer, primary_key=True)                    # Identificador único de la cuenta (PK)
+    email = Column(String, unique=True, nullable=False)       # Email único para inicio de sesión
+    plan = Column(String, nullable=False)                     # Tipo de plan suscrito (ej. básico, premium)
+    pin = Column(String, nullable=True)                       # Código PIN opcional para acceso
+    fecha_alta = Column(DateTime, server_default=func.now())  # Fecha y hora de creación automática
 
-    perfiles = relationship(
+    perfiles = relationship(                                  # Relación 1:N con Perfil
         "Perfil",
         back_populates="cuenta",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan",                         # Borrado en cascada al eliminar cuenta
     )
 
 
-class Perfil(Base):
-    __tablename__ = "perfiles"
+class Perfil(Base):                                           # Modelo de datos para Perfil
+    __tablename__ = "perfiles"                                # Define el nombre de la tabla en BD
 
-    id = Column(Integer, primary_key=True)
-    cuenta_id = Column(Integer, ForeignKey("cuentas.id"), nullable=False)
-    nombre = Column(String, nullable=False)
-    es_infantil = Column(Boolean, default=False)
-    avatar = Column(String, nullable=True)
+    id = Column(Integer, primary_key=True)                    # Identificador único del perfil (PK)
+    cuenta_id = Column(Integer, ForeignKey("cuentas.id"), nullable=False) # FK vinculada a la Cuenta
+    nombre = Column(String, nullable=False)                   # Nombre del perfil
+    es_infantil = Column(Boolean, default=False)              # Flag para filtro de contenido infantil
+    avatar = Column(String, nullable=True)                    # Ruta o identificador del avatar seleccionado
 
-    cuenta = relationship("Cuenta", back_populates="perfiles")
-    vistas = relationship("Vista", back_populates="perfil", cascade="all, delete-orphan")
-    calificaciones = relationship(
+    cuenta = relationship("Cuenta", back_populates="perfiles")# Relación inversa con Cuenta
+    vistas = relationship("Vista", back_populates="perfil", cascade="all, delete-orphan") # Historial de visualizaciones
+    calificaciones = relationship(                            # Relación con Calificaciones del perfil
         "Calificacion",
         back_populates="perfil",
         cascade="all, delete-orphan",
     )
-    mi_lista = relationship(
+    mi_lista = relationship(                                  # Relación N:M con Contenido ("Mi lista")
         "Contenido",
         secondary="mi_lista",
         back_populates="en_listas",
     )
 
     __table_args__ = (
-        UniqueConstraint("cuenta_id", "nombre", name="uq_perfil_nombre_por_cuenta"),
+        UniqueConstraint("cuenta_id", "nombre", name="uq_perfil_nombre_por_cuenta"), # Evita perfiles con mismo nombre en una cuenta
     )
