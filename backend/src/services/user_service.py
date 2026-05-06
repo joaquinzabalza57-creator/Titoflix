@@ -1,137 +1,140 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
 
-from src.dtos.user_dto import (
-    CreateCuentaDTO,
-    CreatePerfilDTO,
-    CuentaResponseDTO,
-    PerfilResponseDTO,
-    UpdateCuentaDTO,
-    UpdatePerfilDTO,
+from src.dtos.user_dto import (                                  # Importa DTOs de Usuario
+    CreateCuentaDTO,                                             # DTO para creación de Cuenta
+    CreatePerfilDTO,                                             # DTO para creación de Perfil
+    CuentaResponseDTO,                                           # DTO para respuesta de Cuenta
+    PerfilResponseDTO,                                           # DTO para respuesta de Perfil
+    UpdateCuentaDTO,                                             # DTO para actualización de Cuenta
+    UpdatePerfilDTO,                                             # DTO para actualización de Perfil
 )
-from src.mappers.user_mapper import (
-    to_cuenta_response,
-    to_cuenta_response_list,
-    to_perfil_response,
-    to_perfil_response_list,
+from src.mappers.user_mapper import (                         # Importa funciones de mapeo de usuario
+    to_cuenta_response,                                      # Mapper de Cuenta a DTO
+    to_cuenta_response_list,                                 # Mapper de lista de Cuentas a DTOs
+    to_perfil_response,                                      # Mapper de Perfil a DTO
+    to_perfil_response_list,                                 # Mapper de lista de Perfiles a DTOs
 )
-from src.repositories.user_repository import CuentaRepository, PerfilRepository
-from src.utils.errors import ConflictError, NotFoundError
+from src.repositories.user_repository import CuentaRepository, PerfilRepository                                        
+# Importa repositorios de datos
+# Repositorio para Cuentas y para Perfiles
+
+from src.utils.errors import ConflictError, NotFoundError    # Importa excepciones personalizadas
 
 
-PLAN_LIMITS = {
-    "basico": 1,
-    "estandar": 2,
-    "premium": 5,
+PLAN_LIMITS = {                                      # Define los límites de perfiles permitidos por plan
+    "basico": 1,                                     # Límite de perfiles para el plan básico
+    "estandar": 2,                                   # Límite de perfiles para el plan estándar
+    "premium": 5,                                    # Límite de perfiles para el plan premium
 }
 
 
-class CuentaService:
-    def __init__(self, db: Session):
-        self.cuenta_repo = CuentaRepository(db)
+class CuentaService:                                            # Servicio para lógica de negocio de Cuentas
+    def __init__(self, db: Session):                            # Inicializa el servicio con sesión de BD
+        self.cuenta_repo = CuentaRepository(db)                 # Instancia el repositorio de Cuentas
 
-    def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO:
-        existing = self.cuenta_repo.find_by_email(dto.email)
+    def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO: # Crea una nueva cuenta
+        existing = self.cuenta_repo.find_by_email(dto.email)    # Verifica si el email ya está registrado
 
-        if existing:
+        if existing:                                            # Si ya existe, lanza error de conflicto
             raise ConflictError("Ya existe una cuenta con ese email")
 
-        cuenta = self.cuenta_repo.create(
+        cuenta = self.cuenta_repo.create(                       # Persiste la nueva cuenta
             email=dto.email,
             plan=dto.plan,
             pin=dto.pin,
         )
 
-        return to_cuenta_response(cuenta)
+        return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
 
-    def get_by_id(self, cuenta_id: int) -> CuentaResponseDTO:
-        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
+    def get_by_id(self, cuenta_id: int) -> CuentaResponseDTO:   # Busca una cuenta por ID
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)         # Obtiene cuenta del repositorio
 
-        if not cuenta:
+        if not cuenta:                                          # Si no existe, lanza error de no encontrado
             raise NotFoundError("Cuenta no encontrada")
 
-        return to_cuenta_response(cuenta)
+        return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
 
-    def list_all(self) -> list[CuentaResponseDTO]:
-        cuentas = self.cuenta_repo.list_all()
-        return to_cuenta_response_list(cuentas)
+    def list_all(self) -> list[CuentaResponseDTO]:              # Obtiene listado de todas las cuentas
+        cuentas = self.cuenta_repo.list_all()                   # Consulta todas las cuentas
+        return to_cuenta_response_list(cuentas)                 # Retorna lista de respuestas mapeadas
 
-    def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO:
-        fields = dto.model_dump(exclude_unset=True)
+    def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO: # Actualiza datos de una cuenta
+        fields = dto.model_dump(exclude_unset=True)             # Extrae solo los campos enviados
 
-        cuenta = self.cuenta_repo.update(cuenta_id, **fields)
+        cuenta = self.cuenta_repo.update(cuenta_id, **fields)   # Realiza la actualización
 
-        if not cuenta:
+        if not cuenta:                                          # Si no existe, lanza error
             raise NotFoundError("Cuenta no encontrada")
 
-        return to_cuenta_response(cuenta)
+        return to_cuenta_response(cuenta)                       # Retorna cuenta actualizada
 
-    def delete(self, cuenta_id: int) -> None:
-        deleted = self.cuenta_repo.delete(cuenta_id)
+    def delete(self, cuenta_id: int) -> None:                   # Elimina una cuenta
+        deleted = self.cuenta_repo.delete(cuenta_id)            # Ejecuta eliminación
 
-        if not deleted:
+        if not deleted:                                         # Si no pudo eliminar (no existe), lanza error
             raise NotFoundError("Cuenta no encontrada")
 
 
-class PerfilService:
-    def __init__(self, db: Session):
-        self.cuenta_repo = CuentaRepository(db)
-        self.perfil_repo = PerfilRepository(db)
+class PerfilService:                                            # Servicio para lógica de negocio de Perfiles
+    def __init__(self, db: Session):                            # Inicializa repositorios requeridos
+        self.cuenta_repo = CuentaRepository(db)                 # Repositorio de Cuentas
+        self.perfil_repo = PerfilRepository(db)                 # Repositorio de Perfiles
 
-    def create(self, dto: CreatePerfilDTO) -> PerfilResponseDTO:
-        cuenta = self.cuenta_repo.find_by_id(dto.cuenta_id)
+    def create(self, dto: CreatePerfilDTO) -> PerfilResponseDTO: # Crea un nuevo perfil
+        cuenta = self.cuenta_repo.find_by_id(dto.cuenta_id)     # Busca cuenta asociada
 
-        if not cuenta:
+        if not cuenta:                                          # Valida existencia de cuenta
             raise NotFoundError("Cuenta no encontrada")
 
-        perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id)
-        max_perfiles = PLAN_LIMITS[cuenta.plan]
+        perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id) # Obtiene perfiles actuales de la cuenta
+        max_perfiles = PLAN_LIMITS[cuenta.plan]                 # Determina límite según plan de suscripción
 
-        if len(perfiles) >= max_perfiles:
+        if len(perfiles) >= max_perfiles:                       # Valida límite de perfiles permitidos
             raise ConflictError("El plan no permite crear más perfiles")
 
-        repeated_name = any(perfil.nombre == dto.nombre for perfil in perfiles)
+        repeated_name = any(perfil.nombre == dto.nombre for perfil in perfiles) # Comprueba si el nombre ya existe
 
-        if repeated_name:
+        if repeated_name:                                       # Evita duplicidad de nombres en la cuenta
             raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
 
-        perfil = self.perfil_repo.create(
+        perfil = self.perfil_repo.create(                       # Persiste el nuevo perfil
             cuenta_id=dto.cuenta_id,
             nombre=dto.nombre,
             es_infantil=dto.es_infantil,
             avatar=dto.avatar,
         )
 
-        return to_perfil_response(perfil)
+        return to_perfil_response(perfil)                       # Retorna respuesta mapeada
 
-    def get_by_id(self, perfil_id: int) -> PerfilResponseDTO:
-        perfil = self.perfil_repo.find_by_id(perfil_id)
+    def get_by_id(self, perfil_id: int) -> PerfilResponseDTO:   # Busca perfil por ID
+        perfil = self.perfil_repo.find_by_id(perfil_id)         # Consulta repositorio
 
-        if not perfil:
+        if not perfil:                                          # Valida existencia
             raise NotFoundError("Perfil no encontrado")
 
-        return to_perfil_response(perfil)
+        return to_perfil_response(perfil)                       # Retorna respuesta mapeada
 
-    def list_by_cuenta(self, cuenta_id: int) -> list[PerfilResponseDTO]:
-        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
+    def list_by_cuenta(self, cuenta_id: int) -> list[PerfilResponseDTO]: # Lista perfiles de una cuenta
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)         # Verifica cuenta antes de listar
 
-        if not cuenta:
+        if not cuenta:                                          # Si la cuenta no existe
             raise NotFoundError("Cuenta no encontrada")
 
-        perfiles = self.perfil_repo.list_by_cuenta(cuenta_id)
-        return to_perfil_response_list(perfiles)
+        perfiles = self.perfil_repo.list_by_cuenta(cuenta_id)   # Obtiene lista de perfiles
+        return to_perfil_response_list(perfiles)                # Retorna lista mapeada
 
-    def update(self, perfil_id: int, dto: UpdatePerfilDTO) -> PerfilResponseDTO:
-        fields = dto.model_dump(exclude_unset=True)
+    def update(self, perfil_id: int, dto: UpdatePerfilDTO) -> PerfilResponseDTO: # Actualiza datos del perfil
+        fields = dto.model_dump(exclude_unset=True)             # Filtra solo campos proporcionados
 
-        perfil = self.perfil_repo.update(perfil_id, **fields)
+        perfil = self.perfil_repo.update(perfil_id, **fields)   # Aplica cambios
 
-        if not perfil:
+        if not perfil:                                          # Valida existencia
             raise NotFoundError("Perfil no encontrado")
 
-        return to_perfil_response(perfil)
+        return to_perfil_response(perfil)                       # Retorna perfil actualizado
 
-    def delete(self, perfil_id: int) -> None:
-        deleted = self.perfil_repo.delete(perfil_id)
+    def delete(self, perfil_id: int) -> None:                   # Elimina un perfil
+        deleted = self.perfil_repo.delete(perfil_id)            # Ejecuta borrado
 
-        if not deleted:
+        if not deleted:                                         # Valida si existía el perfil
             raise NotFoundError("Perfil no encontrado")
