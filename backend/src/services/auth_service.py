@@ -9,12 +9,14 @@ from src.utils.jwt import create_access_token
 
 class AuthService:
     def __init__(self, db: Session):
-        self.repo = UserRepository(db)
+        self.user_repo = UserRepository(db)
 
     def login(self, dto: LoginDTO) -> TokenDTO:
-        user = self.repo.find_by_email(dto.email)
+        user = self.user_repo.find_by_email(dto.email)
+
         if not user or not verify_password(dto.password, user.password_hash):
-            raise UnauthorizedError("Invalid credentials")
+            raise UnauthorizedError("Credenciales invalidas")
 
         token = create_access_token({"sub": str(user.id), "email": user.email})
-        return TokenDTO(access_token=token)
+
+        return TokenDTO(access_token=token, token_type="bearer")
