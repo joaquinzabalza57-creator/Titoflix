@@ -1,24 +1,22 @@
-from src.db.models.user_model import User
-from src.db.models import Cuenta, Perfil
-from src.dtos.user_dto import CuentaResponseDTO, PerfilResponseDTO, UserResponseDTO
+from src.db.models.user_model import User                # Importa el modelo de Usuario
+from src.db.models import Cuenta, Perfil                 # Importa modelos de Cuenta y Perfil
+from src.dtos.user_dto import CuentaResponseDTO, PerfilResponseDTO, UserResponseDTO # Importa DTOs de usuario
 
-
-def to_user_response(user: User) -> UserResponseDTO:
+def to_user_response(user: User) -> UserResponseDTO:     # Convierte Usuario a DTO
     """Convierte un Model SQLAlchemy en un DTO de respuesta (sin campos sensibles)."""
-    return UserResponseDTO.model_validate(user)
+    return UserResponseDTO.model_validate(user)          # Valida y transforma al esquema
+
+def to_cuenta_response(cuenta: Cuenta) -> CuentaResponseDTO:    # Convierte Cuenta a DTO
+    return CuentaResponseDTO.model_validate(cuenta)             # Valida y transforma al esquema
 
 
-def to_cuenta_response(cuenta: Cuenta) -> CuentaResponseDTO:
-    return CuentaResponseDTO.model_validate(cuenta)
+def to_perfil_response(perfil: Perfil) -> PerfilResponseDTO:    # Convierte Perfil a DTO
+    return PerfilResponseDTO.model_validate(perfil)             # Valida y transforma al esquema
 
 
-def to_perfil_response(perfil: Perfil) -> PerfilResponseDTO:
-    return PerfilResponseDTO.model_validate(perfil)
+def to_cuenta_response_list(cuentas: list[Cuenta]) -> list[CuentaResponseDTO]:    # Convierte lista de Cuentas a DTOs
+    return [to_cuenta_response(cuenta) for cuenta in cuentas]                     # Itera y aplica el mapper individual
 
 
-def to_cuenta_response_list(cuentas: list[Cuenta]) -> list[CuentaResponseDTO]:
-    return [to_cuenta_response(cuenta) for cuenta in cuentas]
-
-
-def to_perfil_response_list(perfiles: list[Perfil]) -> list[PerfilResponseDTO]:
+def to_perfil_response_list(perfiles: list[Perfil]) -> list[PerfilResponseDTO]:   # Convierte lista de Perfiles a DTOs
     return [to_perfil_response(perfil) for perfil in perfiles]
