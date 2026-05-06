@@ -2,26 +2,6 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class CreateUserDTO(BaseModel):
-    email: str                                   # Correo electrónico del usuario
-    password: str                                # Contraseña del usuario
-    age: int                                     # Edad del usuario
-
-
-class UpdateUserDTO(BaseModel):
-    email: str | None = None                     # Email opcional (solo se envía si se actualiza)
-    password: str | None = None                  # Contraseña opcional (solo se envía si se actualiza)
-    age: int | None = None                       # Edad opcional (solo se envía si se actualiza)
-
-
-class UserResponseDTO(BaseModel):
-    id: int                                      # ID único del usuario
-    email: str                                   # Correo electrónico del usuario
-    age: int                                     # Edad del usuario
-    created_at: datetime                         # Fecha y hora de creación de la cuenta
-
-    model_config = {"from_attributes": True}     # Configuración para lectura desde ORM
-
 class CreateCuentaDTO(BaseModel):
     email: str                                   # Email del usuario (obligatorio)
     password: str

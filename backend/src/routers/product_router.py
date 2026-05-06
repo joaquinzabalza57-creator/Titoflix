@@ -18,9 +18,7 @@ from src.schemas.product_schema import (
     CreateEpisodioSchema,
     CreateTemporadaSchema,
     CreateVistaSchema,
-    EpisodioSchema,
     GeneroSchema,
-    TemporadaSchema,
     UpdateContenidoSchema,
     VistaSchema,
 )
@@ -108,7 +106,7 @@ def delete_contenido(contenido_id: int, db: Session = Depends(get_db)):
 
 @router.post(
     "/temporadas",
-    response_model=TemporadaSchema,
+    response_model=CreateTemporadaSchema,
     status_code=status.HTTP_201_CREATED,
 )
 def create_temporada(payload: CreateTemporadaSchema, db: Session = Depends(get_db)):
@@ -117,14 +115,14 @@ def create_temporada(payload: CreateTemporadaSchema, db: Session = Depends(get_d
     return TemporadaService(db).create(dto)
 
 
-@router.get("/contenidos/{contenido_id}/temporadas", response_model=list[TemporadaSchema])
+@router.get("/contenidos/{contenido_id}/temporadas", response_model=list[CreateTemporadaSchema])
 def list_temporadas(contenido_id: int, db: Session = Depends(get_db)):
     return TemporadaService(db).list_by_contenido(contenido_id)
 
 
 @router.post(
     "/episodios",
-    response_model=EpisodioSchema,
+    response_model=CreateEpisodioSchema,
     status_code=status.HTTP_201_CREATED,
 )
 def create_episodio(payload: CreateEpisodioSchema, db: Session = Depends(get_db)):
@@ -133,7 +131,7 @@ def create_episodio(payload: CreateEpisodioSchema, db: Session = Depends(get_db)
     return EpisodioService(db).create(dto)
 
 
-@router.get("/temporadas/{temporada_id}/episodios", response_model=list[EpisodioSchema])
+@router.get("/temporadas/{temporada_id}/episodios", response_model=list[CreateEpisodioSchema])
 def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
     return EpisodioService(db).list_by_temporada(temporada_id)
 

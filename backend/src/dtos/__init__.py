@@ -20,13 +20,10 @@ from .product_dto import (                              # Importa DTOs relaciona
 from .user_dto import (                                 # Importa DTOs relacionados a usuarios
     CreateCuentaDTO,
     CreatePerfilDTO,
-    CreateUserDTO,
     CuentaResponseDTO,
     PerfilResponseDTO,
     UpdateCuentaDTO,
     UpdatePerfilDTO,
-    UpdateUserDTO,
-    UserResponseDTO,
 )
 
 __all__ = [                                             # Define qué se exporta al usar "from module import *"
