@@ -1,2 +1,283 @@
-# TODO: implementar ProductRepository (create, find_by_id, list_all, update, delete)
-# Seguí el patrón de user_repository.py
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from src.db.models import Calificacion, Contenido, Episodio, Genero, Temporada, Vista
+
+
+class GeneroRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, nombre: str) -> Genero:
+        genero = Genero(nombre=nombre)
+        self.db.add(genero)
+        self.db.commit()
+        self.db.refresh(genero)
+        return genero
+
+    def find_by_id(self, genero_id: int) -> Genero | None:
+        return self.db.query(Genero).filter(Genero.id == genero_id).first()
+
+    def list_all(self) -> list[Genero]:
+        return self.db.query(Genero).order_by(Genero.nombre).all()
+
+
+class ContenidoRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(
+        self,
+        titulo: str,
+        tipo: str,
+        anio: int,
+        clasificacion_edad: str,
+        descripcion: str | None = None,
+        duracion_min: int | None = None,
+        generos_ids: list[int] | None = None,
+    ) -> Contenido:
+        contenido = Contenido(
+            titulo=titulo,
+            tipo=tipo,
+            anio=anio,
+            descripcion=descripcion,
+            duracion_min=duracion_min,
+            clasificacion_edad=clasificacion_edad,
+        )
+
+        if generos_ids:
+            contenido.generos = (
+                self.db.query(Genero)
+                .filter(Genero.id.in_(generos_ids))
+                .all()
+            )
+
+        self.db.add(contenido)
+        self.db.commit()
+        self.db.refresh(contenido)
+        return contenido
+
+    def find_by_id(self, contenido_id: int) -> Contenido | None:
+        return self.db.query(Contenido).filter(Contenido.id == contenido_id).first()
+
+    def list_all(self) -> list[Contenido]:
+        return self.db.query(Contenido).all()
+
+    def search(
+        self,
+        texto: str | None = None,
+        tipo: str | None = None,
+        genero_id: int | None = None,
+        clasificacion_edad: str | None = None,
+    ) -> list[Contenido]:
+        query = self.db.query(Contenido)
+
+        if texto:
+            query = query.filter(Contenido.titulo.ilike(f"%{texto}%"))
+
+        if tipo:
+            query = query.filter(Contenido.tipo == tipo)
+
+        if clasificacion_edad:
+            query = query.filter(Contenido.clasificacion_edad == clasificacion_edad)
+
+        if genero_id:
+            query = query.join(Contenido.generos).filter(Genero.id == genero_id)
+
+        return query.all()
+
+    def top(self, limit: int = 10) -> list[Contenido]:
+        return (
+            self.db.query(Contenido)
+            .join(Calificacion)
+            .group_by(Contenido.id)
+            .order_by(func.avg(Calificacion.puntaje).desc())
+            .limit(limit)
+            .all()
+        )
+
+    def update(self, contenido_id: int, **fields) -> Contenido | None:
+        generos_ids = fields.pop("generos_ids", None)
+        contenido = self.find_by_id(contenido_id)
+
+        if not contenido:
+            return None
+
+        for key, value in fields.items():
+            setattr(contenido, key, value)
+
+        if generos_ids is not None:
+            contenido.generos = (
+                self.db.query(Genero)
+                .filter(Genero.id.in_(generos_ids))
+                .all()
+            )
+
+        self.db.commit()
+        self.db.refresh(contenido)
+        return contenido
+
+    def delete(self, contenido_id: int) -> bool:
+        contenido = self.find_by_id(contenido_id)
+        if not contenido:
+            return False
+
+        self.db.delete(contenido)
+        self.db.commit()
+        return True
+
+
+class TemporadaRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, contenido_id: int, numero: int, anio: int) -> Temporada:
+        temporada = Temporada(contenido_id=contenido_id, numero=numero, anio=anio)
+        self.db.add(temporada)
+        self.db.commit()
+        self.db.refresh(temporada)
+        return temporada
+
+    def find_by_id(self, temporada_id: int) -> Temporada | None:
+        return self.db.query(Temporada).filter(Temporada.id == temporada_id).first()
+
+    def list_by_contenido(self, contenido_id: int) -> list[Temporada]:
+        return (
+            self.db.query(Temporada)
+            .filter(Temporada.contenido_id == contenido_id)
+            .order_by(Temporada.numero)
+            .all()
+        )
+
+
+class EpisodioRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(
+        self,
+        temporada_id: int,
+        numero: int,
+        titulo: str,
+        duracion_min: int,
+    ) -> Episodio:
+        episodio = Episodio(
+            temporada_id=temporada_id,
+            numero=numero,
+            titulo=titulo,
+            duracion_min=duracion_min,
+        )
+        self.db.add(episodio)
+        self.db.commit()
+        self.db.refresh(episodio)
+        return episodio
+
+    def find_by_id(self, episodio_id: int) -> Episodio | None:
+        return self.db.query(Episodio).filter(Episodio.id == episodio_id).first()
+
+    def list_by_temporada(self, temporada_id: int) -> list[Episodio]:
+        return (
+            self.db.query(Episodio)
+            .filter(Episodio.temporada_id == temporada_id)
+            .order_by(Episodio.numero)
+            .all()
+        )
+
+
+class VistaRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_or_update(
+        self,
+        perfil_id: int,
+        episodio_id: int,
+        segundos_vistos: int,
+        terminado: bool,
+    ) -> Vista:
+        vista = (
+            self.db.query(Vista)
+            .filter(
+                Vista.perfil_id == perfil_id,
+                Vista.episodio_id == episodio_id,
+            )
+            .first()
+        )
+
+        if not vista:
+            vista = Vista(perfil_id=perfil_id, episodio_id=episodio_id)
+            self.db.add(vista)
+
+        vista.segundos_vistos = segundos_vistos
+        vista.terminado = terminado
+
+        self.db.commit()
+        self.db.refresh(vista)
+        return vista
+
+    def list_by_perfil(self, perfil_id: int) -> list[Vista]:
+        return (
+            self.db.query(Vista)
+            .filter(Vista.perfil_id == perfil_id)
+            .order_by(Vista.fecha.desc())
+            .all()
+        )
+
+    def continuar_viendo(self, perfil_id: int) -> list[Vista]:
+        return (
+            self.db.query(Vista)
+            .filter(
+                Vista.perfil_id == perfil_id,
+                Vista.terminado == False,
+                Vista.segundos_vistos > 0,
+            )
+            .order_by(Vista.fecha.desc())
+            .all()
+        )
+
+
+class CalificacionRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_or_update(
+        self,
+        perfil_id: int,
+        contenido_id: int,
+        puntaje: int,
+    ) -> Calificacion:
+        calificacion = (
+            self.db.query(Calificacion)
+            .filter(
+                Calificacion.perfil_id == perfil_id,
+                Calificacion.contenido_id == contenido_id,
+            )
+            .first()
+        )
+
+        if not calificacion:
+            calificacion = Calificacion(
+                perfil_id=perfil_id,
+                contenido_id=contenido_id,
+            )
+            self.db.add(calificacion)
+
+        calificacion.puntaje = puntaje
+
+        self.db.commit()
+        self.db.refresh(calificacion)
+        return calificacion
+
+    def list_by_contenido(self, contenido_id: int) -> list[Calificacion]:
+        return (
+            self.db.query(Calificacion)
+            .filter(Calificacion.contenido_id == contenido_id)
+            .all()
+        )
+
+    def list_by_perfil(self, perfil_id: int) -> list[Calificacion]:
+        return (
+            self.db.query(Calificacion)
+            .filter(Calificacion.perfil_id == perfil_id)
+            .all()
+        )
