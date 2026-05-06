@@ -15,3 +15,25 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# ============================================================================
+# FUNCIONES ÚTILES PARA DESARROLLO
+# ============================================================================
+
+def create_tables():
+    """Crea todas las tablas en la BD (útil para inicialización)."""
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tablas creadas exitosamente")
+
+
+def drop_tables():
+    """Elimina todas las tablas (⚠️ PELIGROSO - borra datos)."""
+    Base.metadata.drop_all(bind=engine)
+    print("⚠️ Todas las tablas eliminadas")
+
+
+def reset_database():
+    """Reinicia la BD: elimina y recrea todas las tablas."""
+    drop_tables()
+    create_tables()
