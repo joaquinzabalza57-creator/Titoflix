@@ -2,27 +2,24 @@ from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
-from src.db.models.user_model import User
-from src.repositories.user_repository import UserRepository
+from src.db.models.user_model import Cuenta
+from src.repositories.user_repository import CuentaRepository
 from src.utils.errors import UnauthorizedError
-from src.utils.jwt import decode_token
+from src.utils.jwt import decode_access_token
 
 
-def get_current_user(
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> User:
+def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> Cuenta:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise UnauthorizedError("Missing or malformed Authorization header")
 
     token = authorization.split(" ", 1)[1].strip()
-    payload = decode_token(token)
+    payload = decode_access_token(token)
 
     user_id = payload.get("sub")
     if user_id is None:
         raise UnauthorizedError("Invalid token payload")
 
-    user = UserRepository(db).find_by_id(int(user_id))
+    user = CuentaRepository(db).find_by_id(int(user_id))
     if user is None:
         raise UnauthorizedError("User no longer exists")
 

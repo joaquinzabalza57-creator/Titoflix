@@ -15,17 +15,14 @@ from .product_schema import (                                 # Importa schemas 
 from .user_schema import (                                    # Importa schemas relacionados a usuarios
     CreateCuentaSchema,
     CreatePerfilSchema,
-    CreateUserSchema,
     CuentaSchema,
     PerfilSchema,
     UpdateCuentaSchema,
     UpdatePerfilSchema,
-    UpdateUserSchema,
 )
 
 __all__ = [                                                   # Define qué se exporta al hacer "from module import *"
     "LoginSchema", "PinSchema", "TokenSchema",                # Schemas de autenticación
-    "CreateUserSchema", "UpdateUserSchema",                  # Schemas de usuario
     "CreateCuentaSchema", "UpdateCuentaSchema", "CuentaSchema",  # Schemas de cuenta
     "CreatePerfilSchema", "UpdatePerfilSchema", "PerfilSchema",  # Schemas de perfil
     "GeneroSchema", "CreateContenidoSchema", "UpdateContenidoSchema",  # Schemas de contenido

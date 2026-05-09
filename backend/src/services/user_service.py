@@ -1,3 +1,4 @@
+from typing import cast
 from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
 
 from src.dtos.user_dto import (                                  # Importa DTOs de Usuario
@@ -45,7 +46,6 @@ class CuentaService:                                            # Servicio para 
             email=dto.email,
             password_hash=password_hash,
             plan=dto.plan,
-            pin=dto.pin,
         )
 
         return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
@@ -94,7 +94,7 @@ class PerfilService:                                            # Servicio para 
             raise NotFoundError("Cuenta no encontrada")
 
         perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id) # Obtiene perfiles actuales de la cuenta
-        max_perfiles = PLAN_LIMITS[cuenta.plan]                 # Determina límite según plan de suscripción
+        max_perfiles = PLAN_LIMITS[cast(str, cuenta.plan)]       # Determina límite según plan de suscripción
 
         if len(perfiles) >= max_perfiles:                       # Valida límite de perfiles permitidos
             raise ConflictError("El plan no permite crear más perfiles")
@@ -107,6 +107,7 @@ class PerfilService:                                            # Servicio para 
         perfil = self.perfil_repo.create(                       # Persiste el nuevo perfil
             cuenta_id=dto.cuenta_id,
             nombre=dto.nombre,
+            pin=dto.pin,
             es_infantil=dto.es_infantil,
             avatar=dto.avatar,
         )

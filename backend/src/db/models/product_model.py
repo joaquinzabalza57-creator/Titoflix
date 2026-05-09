@@ -112,7 +112,7 @@ class Vista(Base):                                                # Modelo de da
     perfil_id = Column(Integer, ForeignKey("perfiles.id"), nullable=False)
     episodio_id = Column(Integer, ForeignKey("episodios.id"), nullable=False)
     fecha = Column(DateTime, server_default=func.now())
-    segundos_vistos = Column(Integer, default=0)
+    segundos_vistos = Column(Integer, default=0)  # Avance en segundos
     terminado = Column(Boolean, default=False)
 
     perfil = relationship("Perfil", back_populates="vistas")

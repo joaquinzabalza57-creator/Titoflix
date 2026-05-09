@@ -3,14 +3,14 @@ from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
 from src.dtos.user_dto import CreateCuentaDTO, UpdateCuentaDTO, CuentaResponseDTO
-from src.schemas.user_schema import CreateUserSchema, UpdateCuentaSchema
-from src.services.user_service import CuentaService, PerfilService
+from src.schemas.user_schema import CreateCuentaSchema, UpdateCuentaSchema
+from src.services.user_service import CuentaService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/", response_model=CuentaResponseDTO, status_code=status.HTTP_201_CREATED)
-def create_user(payload: CreateUserSchema, db: Session = Depends(get_db)):
+def create_user(payload: CreateCuentaSchema, db: Session = Depends(get_db)):
     """Crear una nueva cuenta de usuario."""
     dto = CreateCuentaDTO(**payload.model_dump())
     return CuentaService(db).create(dto)

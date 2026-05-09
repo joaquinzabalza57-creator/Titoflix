@@ -1,15 +1,14 @@
 from sqlalchemy.orm import Session
 
 from src.db.models import Contenido, Cuenta, Perfil
-from src.db.models.user_model import Cuenta, Perfil
 
 
 class CuentaRepository:
     def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
         self.db = db
 
-    def create(self, email: str, password_hash: str, plan: str, pin: str | None = None) -> Cuenta: # Crea y persiste una nueva cuenta
-        cuenta = Cuenta(email=email, password_hash=password_hash, plan=plan, pin=pin)
+    def create(self, email: str, password_hash: str, plan: str) -> Cuenta: # Crea y persiste una nueva cuenta
+        cuenta = Cuenta(email=email, password_hash=password_hash, plan=plan)
         self.db.add(cuenta)
         self.db.commit()                                                 # Guarda cambios en la base de datos
         self.db.refresh(cuenta)                                          # Actualiza la instancia con datos de DB
@@ -50,16 +49,11 @@ class PerfilRepository:
     def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
         self.db = db
 
-    def create(                                                         # Crea y persiste un nuevo perfil
-        self,
-        cuenta_id: int,
-        nombre: str,
-        es_infantil: bool = False,
-        avatar: str | None = None,
-    ) -> Perfil:
+    def create(self, cuenta_id: int, nombre: str, pin: str | None = None, es_infantil: bool = False, avatar: str | None = None) -> Perfil:
         perfil = Perfil(
             cuenta_id=cuenta_id,
             nombre=nombre,
+            pin=pin,
             es_infantil=es_infantil,
             avatar=avatar,
         )

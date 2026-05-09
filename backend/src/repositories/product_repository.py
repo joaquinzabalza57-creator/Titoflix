@@ -193,13 +193,7 @@ class VistaRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_or_update(
-        self,
-        perfil_id: int,
-        episodio_id: int,
-        segundos_vistos: int,
-        terminado: bool,
-    ) -> Vista:
+    def create_or_update(self, perfil_id: int, episodio_id: int, segundos_vistos: int, terminado: bool) -> Vista:
         vista = (
             self.db.query(Vista)
             .filter(
