@@ -16,4 +16,5 @@ class PinSchema(BaseModel):
 
 
 class PerfilAuthSchema(BaseModel):
+    access_token: str = Field(min_length=1)
     pin: str | None = Field(default=None, pattern=r"^\d{4}$")

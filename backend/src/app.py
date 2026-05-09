@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from src.middlewares import app_error_handler
 from src.routers import auth_router, product_router, user_router
-from src.utils.errors import AppError
+from src.utils import AppError
 
 
 API_PREFIX = "/api/v1"

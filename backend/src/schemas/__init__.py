@@ -10,6 +10,8 @@ from .product_schema import (
     GeneroSchema,
     MiListaSchema,
     UpdateContenidoSchema,
+    UpsertCalificacionSchema,
+    UpsertVistaSchema,
     VistaSchema,
 )
 from .user_schema import (
@@ -39,6 +41,8 @@ __all__ = [
     "CreateTemporadaSchema",
     "CreateEpisodioSchema",
     "CreateVistaSchema",
+    "UpsertVistaSchema",
+    "UpsertCalificacionSchema",
     "VistaSchema",
     "CreateCalificacionSchema",
     "CalificacionSchema",

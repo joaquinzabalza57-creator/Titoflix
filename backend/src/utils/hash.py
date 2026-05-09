@@ -8,4 +8,7 @@ def hash_password(plain: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    if pwd_context.identify(hashed) is None:
+        return plain == hashed
+
     return pwd_context.verify(plain, hashed)

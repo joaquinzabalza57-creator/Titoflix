@@ -224,23 +224,55 @@ class EpisodioService:
 class VistaService:
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
+        self.contenido_repo = ContenidoRepository(db)
         self.episodio_repo = EpisodioRepository(db)
         self.vista_repo = VistaRepository(db)
 
+    def create(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        if self.vista_repo.find_existing(dto.perfil_id, dto.episodio_id, dto.contenido_id):
+            raise ConflictError("La vista ya existe para este perfil y episodio")
+
+        return self._save(dto)
+
+    def update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        if not self.vista_repo.find_existing(dto.perfil_id, dto.episodio_id, dto.contenido_id):
+            raise NotFoundError("Vista no encontrada")
+
+        return self._save(dto)
+
     def create_or_update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        return self._save(dto)
+
+    def _save(self, dto: CreateVistaDTO) -> VistaResponseDTO:
         perfil = self.perfil_repo.find_by_id(dto.perfil_id)
         if not perfil:
             raise NotFoundError("Perfil no encontrado")
 
-        episodio = self.episodio_repo.find_by_id(dto.episodio_id)
-        if not episodio:
-            raise NotFoundError("Episodio no encontrado")
+        if (dto.episodio_id is None) == (dto.contenido_id is None):
+            raise ConflictError("La vista debe ser de un episodio o de una pelicula")
 
-        contenido = episodio.temporada.contenido
+        if dto.episodio_id is not None:
+            episodio = self.episodio_repo.find_by_id(dto.episodio_id)
+            if not episodio:
+                raise NotFoundError("Episodio no encontrado")
+
+            contenido = episodio.temporada.contenido
+            duracion_min = episodio.duracion_min
+        else:
+            contenido = self.contenido_repo.find_by_id(dto.contenido_id)  # type: ignore[arg-type]
+            if not contenido:
+                raise NotFoundError("Contenido no encontrado")
+            if contenido.tipo != "pelicula":
+                raise ConflictError("Las series se registran por episodio")
+            if contenido.duracion_min is None:
+                raise ConflictError("La pelicula debe tener duracion")
+
+            duracion_min = contenido.duracion_min
+
         if perfil.es_infantil and contenido.clasificacion_edad != "ATP":
             raise ForbiddenError("El perfil infantil no puede ver este contenido")
 
-        duracion_segundos = episodio.duracion_min * 60
+        duracion_segundos = duracion_min * 60
         if dto.segundos_vistos > duracion_segundos:
             raise ConflictError("Los segundos vistos superan la duracion")
 
@@ -248,6 +280,7 @@ class VistaService:
         vista = self.vista_repo.create_or_update(
             perfil_id=dto.perfil_id,
             episodio_id=dto.episodio_id,
+            contenido_id=dto.contenido_id,
             segundos_vistos=dto.segundos_vistos,
             terminado=terminado,
         )
@@ -259,6 +292,24 @@ class VistaService:
 
         vistas = self.vista_repo.continuar_viendo(perfil_id)[:10]
         return to_vista_response_list(vistas)
+
+    def delete(
+        self,
+        perfil_id: int,
+        episodio_id: int | None = None,
+        contenido_id: int | None = None,
+    ) -> None:
+        if not self.perfil_repo.find_by_id(perfil_id):
+            raise NotFoundError("Perfil no encontrado")
+
+        if episodio_id is not None and not self.episodio_repo.find_by_id(episodio_id):
+            raise NotFoundError("Episodio no encontrado")
+
+        if contenido_id is not None and not self.contenido_repo.find_by_id(contenido_id):
+            raise NotFoundError("Contenido no encontrado")
+
+        if not self.vista_repo.delete(perfil_id, episodio_id, contenido_id):
+            raise NotFoundError("Vista no encontrada")
 
 
 class MiListaService:
@@ -309,7 +360,22 @@ class CalificacionService:
         self.calificacion_repo = CalificacionRepository(db)
         self.vista_repo = VistaRepository(db)
 
+    def create(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        if self.calificacion_repo.find_by_perfil_and_contenido(dto.perfil_id, dto.contenido_id):
+            raise ConflictError("La calificacion ya existe para este perfil y contenido")
+
+        return self._save(dto)
+
+    def update(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        if not self.calificacion_repo.find_by_perfil_and_contenido(dto.perfil_id, dto.contenido_id):
+            raise NotFoundError("Calificacion no encontrada")
+
+        return self._save(dto)
+
     def create_or_update(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        return self._save(dto)
+
+    def _save(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
         perfil = self.perfil_repo.find_by_id(dto.perfil_id)
         if not perfil:
             raise NotFoundError("Perfil no encontrado")
@@ -320,7 +386,13 @@ class CalificacionService:
 
         vistas = self.vista_repo.list_by_perfil(dto.perfil_id)
         empezo_contenido = any(
-            vista.episodio.temporada.contenido_id == dto.contenido_id
+            (
+                vista.contenido_id == dto.contenido_id
+                or (
+                    vista.episodio is not None
+                    and vista.episodio.temporada.contenido_id == dto.contenido_id
+                )
+            )
             and vista.segundos_vistos > 0
             for vista in vistas
         )
@@ -333,3 +405,13 @@ class CalificacionService:
             puntaje=dto.puntaje,
         )
         return to_calificacion_response(calificacion)
+
+    def delete(self, perfil_id: int, contenido_id: int) -> None:
+        if not self.perfil_repo.find_by_id(perfil_id):
+            raise NotFoundError("Perfil no encontrado")
+
+        if not self.contenido_repo.find_by_id(contenido_id):
+            raise NotFoundError("Contenido no encontrado")
+
+        if not self.calificacion_repo.delete(perfil_id, contenido_id):
+            raise NotFoundError("Calificacion no encontrada")

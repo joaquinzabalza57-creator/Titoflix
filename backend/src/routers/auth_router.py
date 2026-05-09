@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.db import get_db
@@ -21,10 +21,10 @@ def login(payload: LoginSchema, db: Session = Depends(get_db)):
 def auth_perfil(
     perfil_id: int,
     payload: PerfilAuthSchema,
-    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    current_user = get_user_from_authorization(authorization, db)
-    dto = PerfilAuthDTO(**payload.model_dump())
+    payload_data = payload.model_dump()
+    current_user = get_user_from_authorization(payload_data["access_token"], db)
+    dto = PerfilAuthDTO(pin=payload_data.get("pin"))
     token: TokenDTO = AuthService(db).auth_perfil(current_user.id, perfil_id, dto)
     return TokenSchema(**token.model_dump())

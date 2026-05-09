@@ -78,7 +78,8 @@ class EpisodioResponseDTO(BaseModel):
 
 class CreateVistaDTO(BaseModel):
     perfil_id: int                               # ID del perfil que ve el episodio
-    episodio_id: int                             # ID del episodio que se está viendo
+    episodio_id: int | None = None               # ID del episodio que se esta viendo
+    contenido_id: int | None = None              # ID de la pelicula que se esta viendo
     segundos_vistos: int = 0                     # Tiempo reproducido en segundos
     terminado: bool = False                      # Estado: True si completó el episodio
 
@@ -86,7 +87,8 @@ class CreateVistaDTO(BaseModel):
 class VistaResponseDTO(BaseModel):
     id: int                                      # ID único de la vista
     perfil_id: int                               # ID del perfil que realizó la vista
-    episodio_id: int                             # ID del episodio visto
+    episodio_id: int | None = None               # ID del episodio visto
+    contenido_id: int | None = None              # ID de la pelicula vista
     fecha: datetime | None = None                # Fecha y hora de la visualización
     segundos_vistos: int                         # Cantidad de segundos reproducidos
     terminado: bool                              # Indica si el episodio se vio completo
