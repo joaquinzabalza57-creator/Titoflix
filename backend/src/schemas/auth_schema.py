@@ -1,15 +1,20 @@
-from pydantic import BaseModel, EmailStr, Field   # Herramientas para validar datos en FastAPI
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginSchema(BaseModel):
-    email: EmailStr                               # Email válido (Pydantic lo valida automáticamente)
-    password: str = Field(min_length=8)            # Contraseña con mínimo 8 caracteres
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
 
 
 class TokenSchema(BaseModel):
-    access_token: str                             # Token JWT generado al iniciar sesión
-    token_type: str = "bearer"                    # Tipo de token (usado en Authorization header)
+    access_token: str
+    token_type: str = "bearer"
 
 
 class PinSchema(BaseModel):
-    pin: str = Field(min_length=4, max_length=4)   # PIN obligatorio de exactamente 4 caracteres
+    pin: str = Field(min_length=4, max_length=8)
+
+
+class PerfilAuthSchema(BaseModel):
+    authorization: str | None = None
+    pin: str | None = Field(default=None, min_length=4, max_length=8)

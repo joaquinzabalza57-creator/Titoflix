@@ -9,10 +9,21 @@ from src.utils.jwt import decode_access_token
 
 
 def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> Cuenta:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    return get_user_from_authorization(authorization, db)
+
+
+def get_user_from_authorization(authorization: str | None, db: Session) -> Cuenta:
+    if not authorization:
         raise UnauthorizedError("Missing or malformed Authorization header")
 
-    token = authorization.split(" ", 1)[1].strip()
+    token = authorization.strip()
+    if token.lower().startswith("bearer "):
+        token = token.split(" ", 1)[1].strip()
+
+    return get_user_from_token(token, db)
+
+
+def get_user_from_token(token: str, db: Session) -> Cuenta:
     payload = decode_access_token(token)
 
     user_id = payload.get("sub")

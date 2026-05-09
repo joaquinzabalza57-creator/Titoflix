@@ -1,22 +1,36 @@
-from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
+from sqlalchemy.orm import Session
 
-from src.dtos.auth_dto import LoginDTO, TokenDTO                 # Importa esquemas para Login y Token
-from src.repositories.user_repository import CuentaRepository    # Importa el repositorio de Usuarios
-from src.utils.errors import UnauthorizedError                   # Importa manejo de errores personalizados
-from src.utils.hash import verify_password                       # Importa utilidad de verificación de contraseñas
-from src.utils.jwt import create_access_token                    # Importa utilidad para generación de tokens
+from src.dtos.auth_dto import LoginDTO, PerfilAuthDTO, TokenDTO
+from src.repositories.user_repository import CuentaRepository, PerfilRepository
+from src.utils.errors import UnauthorizedError
+from src.utils.hash import verify_password
+from src.utils.jwt import create_access_token
 
 
-class AuthService:                                            # Servicio para manejar la autenticación
-    def __init__(self, db: Session):                          # Inicializa el servicio con sesión de BD
-        self.cuenta_repo = CuentaRepository(db)                 # Instancia el repositorio de Usuarios
+class AuthService:
+    def __init__(self, db: Session):
+        self.cuenta_repo = CuentaRepository(db)
+        self.perfil_repo = PerfilRepository(db)
 
-    def login(self, dto: LoginDTO) -> TokenDTO:               # Autentica usuario y genera token
-        cuenta = self.cuenta_repo.find_by_email(dto.email)        # Busca usuario en la BD por email
+    def login(self, dto: LoginDTO) -> TokenDTO:
+        cuenta = self.cuenta_repo.find_by_email(dto.email)
 
-        if not cuenta or not verify_password(dto.password, cuenta.password_hash): # Valida credenciales
-            raise UnauthorizedError("Credenciales invalidas") # Lanza error si fallan
+        if not cuenta or not verify_password(dto.password, cuenta.password_hash): # type: ignore
+            raise UnauthorizedError("Credenciales invalidas")
 
-        token = create_access_token({"sub": str(cuenta.id), "email": cuenta.email}) # Genera JWT de acceso
+        token = create_access_token({"sub": str(cuenta.id), "email": cuenta.email})
 
-        return TokenDTO(access_token=token, token_type="bearer") # Retorna DTO con el token
+        return TokenDTO(access_token=token, token_type="bearer")
+
+    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> TokenDTO:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+
+        if not perfil or perfil.cuenta_id != cuenta_id: # type: ignore
+            raise UnauthorizedError("Perfil no autorizado")
+
+        if perfil.pin and dto.pin != perfil.pin: # type: ignore
+            raise UnauthorizedError("PIN invalido")
+
+        token = create_access_token({"sub": str(cuenta_id), "perfil_id": str(perfil.id)})
+
+        return TokenDTO(access_token=token, token_type="bearer")
