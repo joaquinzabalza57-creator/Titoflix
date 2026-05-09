@@ -40,7 +40,6 @@ class PerfilResponseDTO(BaseModel):
     id: int                                      # ID único del perfil
     cuenta_id: int                               # ID de la cuenta a la que pertenece
     nombre: str                                  # Nombre del perfil
-    pin: str | None = None                       # PIN opcional de seguridad
     es_infantil: bool                            # Indica si es un perfil infantil
     avatar: str | None = None                    # URL o referencia del avatar
 

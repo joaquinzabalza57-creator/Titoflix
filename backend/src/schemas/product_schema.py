@@ -21,7 +21,7 @@ class CreateContenidoSchema(BaseModel):
     descripcion: str | None = None              # Descripción opcional
     duracion_min: int | None = Field(default=None, gt=0)  # Duración en minutos (opcional, > 0)
     clasificacion_edad: ClasificacionEdad       # Clasificación por edad (ATP, +13, +16, +18)
-    generos_ids: list[int] = []                 # Lista de IDs de géneros asociados
+    generos_ids: list[int] = Field(default_factory=list)  # Lista de IDs de generos asociados
 
 class UpdateContenidoSchema(BaseModel):
     titulo: str | None = Field(default=None, min_length=1)  # Título opcional (mínimo 1 caracter)
@@ -41,6 +41,7 @@ class ContenidoSchema(BaseModel):
     descripcion: str | None = None               # Descripción opcional
     duracion_min: int | None = None              # Duración en minutos (opcional)
     clasificacion_edad: ClasificacionEdad        # Clasificación por edad (ATP, +13, +16, +18)
+    promedio_calificaciones: float | None = None
 
     model_config = {"from_attributes": True}     # Permite crear el schema desde objetos ORM (SQLAlchemy)
 

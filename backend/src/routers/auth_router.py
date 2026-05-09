@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
-from src.db.connection import get_db
-from src.dtos.auth_dto import LoginDTO, PerfilAuthDTO, TokenDTO
-from src.middlewares.auth_middleware import get_user_from_authorization
-from src.schemas.auth_schema import LoginSchema, PerfilAuthSchema, TokenSchema
-from src.services.auth_service import AuthService
+from src.db import get_db
+from src.dtos import LoginDTO, PerfilAuthDTO, TokenDTO
+from src.middlewares import get_user_from_authorization
+from src.schemas import LoginSchema, PerfilAuthSchema, TokenSchema
+from src.services import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -21,10 +21,10 @@ def login(payload: LoginSchema, db: Session = Depends(get_db)):
 def auth_perfil(
     perfil_id: int,
     payload: PerfilAuthSchema,
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    payload_data = payload.model_dump()
-    current_user = get_user_from_authorization(payload_data.get("authorization"), db)
-    dto = PerfilAuthDTO(pin=payload_data.get("pin"))
+    current_user = get_user_from_authorization(authorization, db)
+    dto = PerfilAuthDTO(**payload.model_dump())
     token: TokenDTO = AuthService(db).auth_perfil(current_user.id, perfil_id, dto)
     return TokenSchema(**token.model_dump())

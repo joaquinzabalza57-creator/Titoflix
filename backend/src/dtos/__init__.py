@@ -1,5 +1,5 @@
-from .auth_dto import LoginDTO, PinDTO, TokenDTO        # Importa DTOs de autenticación
-from .product_dto import (                              # Importa DTOs relacionados a contenido/productos
+from .auth_dto import LoginDTO, PerfilAuthDTO, PinDTO, TokenDTO
+from .product_dto import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
     CreateCalificacionDTO,
@@ -17,7 +17,7 @@ from .product_dto import (                              # Importa DTOs relaciona
     UpdateProductDTO,
     VistaResponseDTO,
 )
-from .user_dto import (                                 # Importa DTOs relacionados a usuarios
+from .user_dto import (
     CreateCuentaDTO,
     CreatePerfilDTO,
     CuentaResponseDTO,
@@ -26,19 +26,31 @@ from .user_dto import (                                 # Importa DTOs relaciona
     UpdatePerfilDTO,
 )
 
-__all__ = [                                             # Define qué se exporta al usar "from module import *"
-    "LoginDTO",                                         # DTOs de autenticación
+__all__ = [
+    "LoginDTO",
     "PinDTO",
+    "PerfilAuthDTO",
     "TokenDTO",
-    "CreateUserDTO", "UpdateUserDTO", "UserResponseDTO",  # DTOs de usuario
-    "CreateCuentaDTO", "UpdateCuentaDTO", "CuentaResponseDTO",  # DTOs de cuenta
-    "CreatePerfilDTO", "UpdatePerfilDTO", "PerfilResponseDTO",  # DTOs de perfil
-    "GeneroResponseDTO",                                # DTO de género
-    "CreateContenidoDTO", "UpdateContenidoDTO", "ContenidoResponseDTO",  # DTOs de contenido
-    "CreateProductDTO", "UpdateProductDTO", "ProductResponseDTO",  # DTOs generales de producto
-    "CreateTemporadaDTO", "TemporadaResponseDTO",       # DTOs de temporada
-    "CreateEpisodioDTO", "EpisodioResponseDTO",         # DTOs de episodio
-    "CreateVistaDTO", "VistaResponseDTO",               # DTOs de vistas
-    "CreateCalificacionDTO", "CalificacionResponseDTO", # DTOs de calificaciones
-    "MiListaDTO",                                      # DTO de lista personalizada
+    "CreateCuentaDTO",
+    "UpdateCuentaDTO",
+    "CuentaResponseDTO",
+    "CreatePerfilDTO",
+    "UpdatePerfilDTO",
+    "PerfilResponseDTO",
+    "GeneroResponseDTO",
+    "CreateContenidoDTO",
+    "UpdateContenidoDTO",
+    "ContenidoResponseDTO",
+    "CreateProductDTO",
+    "UpdateProductDTO",
+    "ProductResponseDTO",
+    "CreateTemporadaDTO",
+    "TemporadaResponseDTO",
+    "CreateEpisodioDTO",
+    "EpisodioResponseDTO",
+    "CreateVistaDTO",
+    "VistaResponseDTO",
+    "CreateCalificacionDTO",
+    "CalificacionResponseDTO",
+    "MiListaDTO",
 ]

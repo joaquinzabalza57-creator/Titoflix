@@ -1,30 +1,31 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.db.models import Calificacion, Contenido, Episodio, Genero, Temporada, Vista
+from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, Vista
 
 
 class GeneroRepository:
-    # Repositorio para manejar operaciones relacionadas con géneros de contenido.
     def __init__(self, db: Session):
-        self.db = db  # Guarda la sesión de base de datos para ejecutar consultas.
+        self.db = db
 
     def create(self, nombre: str) -> Genero:
-        genero = Genero(nombre=nombre)  # Crea el objeto Genero en memoria.
+        genero = Genero(nombre=nombre)
         self.db.add(genero)
         self.db.commit()
         self.db.refresh(genero)
-        return genero  # Devuelve el género persistido.
+        return genero
 
     def find_by_id(self, genero_id: int) -> Genero | None:
-        return self.db.query(Genero).filter(Genero.id == genero_id).first()  # Busca un género por su id.
+        return self.db.query(Genero).filter(Genero.id == genero_id).first()
+
+    def find_by_name(self, nombre: str) -> Genero | None:
+        return self.db.query(Genero).filter(func.lower(Genero.nombre) == nombre.lower()).first()
 
     def list_all(self) -> list[Genero]:
-        return self.db.query(Genero).order_by(Genero.nombre).all()  # Devuelve todos los géneros ordenados por nombre.
+        return self.db.query(Genero).order_by(Genero.nombre).all()
 
 
 class ContenidoRepository:
-    # Repositorio para manejar operaciones relacionadas con contenidos (películas, series, etc.).
     def __init__(self, db: Session):
         self.db = db
 
@@ -45,104 +46,112 @@ class ContenidoRepository:
             descripcion=descripcion,
             duracion_min=duracion_min,
             clasificacion_edad=clasificacion_edad,
-        )  # Inicializa el contenido con los campos recibidos.
+        )
 
         if generos_ids:
-            contenido.generos = (
-                self.db.query(Genero)
-                .filter(Genero.id.in_(generos_ids))
-                .all()
-            )  # Si hay ids de géneros, los carga y asocia al contenido.
+            contenido.generos = self.db.query(Genero).filter(Genero.id.in_(generos_ids)).all()
 
         self.db.add(contenido)
         self.db.commit()
         self.db.refresh(contenido)
-        return contenido  # Retorna el contenido recién creado.
+        return contenido
 
     def find_by_id(self, contenido_id: int) -> Contenido | None:
-        return self.db.query(Contenido).filter(Contenido.id == contenido_id).first()  # Busca contenido por id.
+        return self.db.query(Contenido).filter(Contenido.id == contenido_id).first()
 
     def list_all(self) -> list[Contenido]:
-        return self.db.query(Contenido).all()  # Lista todos los contenidos.
+        return self.db.query(Contenido).all()
 
     def search(
         self,
         texto: str | None = None,
         tipo: str | None = None,
         genero_id: int | None = None,
+        genero: str | None = None,
         clasificacion_edad: str | None = None,
+        ordenar: str | None = None,
     ) -> list[Contenido]:
-        query = self.db.query(Contenido)  # Inicia la consulta sobre el modelo Contenido.
+        query = self.db.query(Contenido)
 
         if texto:
-            query = query.filter(Contenido.titulo.ilike(f"%{texto}%"))  # Filtra por texto en el título.
+            query = query.filter(Contenido.titulo.ilike(f"%{texto}%"))
 
         if tipo:
-            query = query.filter(Contenido.tipo == tipo)  # Filtra por tipo de contenido.
+            query = query.filter(Contenido.tipo == tipo)
 
         if clasificacion_edad:
-            query = query.filter(Contenido.clasificacion_edad == clasificacion_edad)  # Filtra por clasificación de edad.
+            query = query.filter(Contenido.clasificacion_edad == clasificacion_edad)
 
         if genero_id:
-            query = query.join(Contenido.generos).filter(Genero.id == genero_id)  # Filtra por género.
+            query = query.join(Contenido.generos).filter(Genero.id == genero_id)
+        elif genero:
+            query = query.join(Contenido.generos).filter(Genero.nombre.ilike(genero))
 
-        return query.all()  # Ejecuta la consulta y devuelve los resultados.
+        if ordenar == "anio_desc":
+            query = query.order_by(Contenido.anio.desc(), Contenido.titulo.asc())
+        else:
+            query = query.order_by(Contenido.titulo.asc())
 
-    def top(self, limit: int = 10) -> list[Contenido]:
-        return (
+        return query.all()
+
+    def top(self, limit: int = 10, genero: str | None = None) -> list[Contenido]:
+        query = (
             self.db.query(Contenido)
-            .join(Calificacion)
-            .group_by(Contenido.id)
-            .order_by(func.avg(Calificacion.puntaje).desc())
+            .join(Contenido.temporadas)
+            .join(Temporada.episodios)
+            .join(Episodio.vistas)
+            .filter(Vista.terminado.is_(True))
+        )
+
+        if genero:
+            query = query.join(Contenido.generos).filter(Genero.nombre.ilike(genero))
+
+        return (
+            query.group_by(Contenido.id)
+            .order_by(func.count(Vista.id).desc(), Contenido.titulo.asc())
             .limit(limit)
             .all()
-        )  # Devuelve los contenidos con mejor promedio de calificación.
+        )
 
     def update(self, contenido_id: int, **fields) -> Contenido | None:
-        generos_ids = fields.pop("generos_ids", None)  # Extrae los géneros si se enviaron.
+        generos_ids = fields.pop("generos_ids", None)
         contenido = self.find_by_id(contenido_id)
-
         if not contenido:
-            return None  # Si no existe el contenido, retorna None.
+            return None
 
         for key, value in fields.items():
-            setattr(contenido, key, value)  # Actualiza dinámicamente los campos recibidos.
+            setattr(contenido, key, value)
 
         if generos_ids is not None:
-            contenido.generos = (
-                self.db.query(Genero)
-                .filter(Genero.id.in_(generos_ids))
-                .all()
-            )  # Reemplaza los géneros si se especificaron.
+            contenido.generos = self.db.query(Genero).filter(Genero.id.in_(generos_ids)).all()
 
         self.db.commit()
         self.db.refresh(contenido)
-        return contenido  # Retorna el contenido actualizado.
+        return contenido
 
     def delete(self, contenido_id: int) -> bool:
-        contenido = self.find_by_id(contenido_id)  # Busca el contenido a eliminar.
+        contenido = self.find_by_id(contenido_id)
         if not contenido:
-            return False  # Retorna False si no existe el contenido.
+            return False
 
         self.db.delete(contenido)
         self.db.commit()
-        return True  # Elimina y confirma la operación.
+        return True
 
 
 class TemporadaRepository:
-    # Repositorio para manejar operaciones relacionadas con temporadas.
     def __init__(self, db: Session):
         self.db = db
 
     def create(self, contenido_id: int, numero: int, anio: int) -> Temporada:
-        temporada = Temporada(contenido_id=contenido_id, numero=numero, anio=anio)  # Crea el objeto Temporada.
+        temporada = Temporada(contenido_id=contenido_id, numero=numero, anio=anio)
         self.db.add(temporada)
         self.db.commit()
         self.db.refresh(temporada)
-        return temporada  # Devuelve la temporada persistida.
+        return temporada
 
     def find_by_id(self, temporada_id: int) -> Temporada | None:
-        return self.db.query(Temporada).filter(Temporada.id == temporada_id).first()  # Busca temporada por id.
+        return self.db.query(Temporada).filter(Temporada.id == temporada_id).first()
 
     def list_by_contenido(self, contenido_id: int) -> list[Temporada]:
         return (
@@ -150,11 +159,10 @@ class TemporadaRepository:
             .filter(Temporada.contenido_id == contenido_id)
             .order_by(Temporada.numero)
             .all()
-        )  # Lista temporadas de un contenido ordenadas por número.
+        )
 
 
 class EpisodioRepository:
-    # Repositorio para manejar operaciones relacionadas con episodios.
     def __init__(self, db: Session):
         self.db = db
 
@@ -170,14 +178,14 @@ class EpisodioRepository:
             numero=numero,
             titulo=titulo,
             duracion_min=duracion_min,
-        )  # Crea el objeto Episodio con los datos recibidos.
+        )
         self.db.add(episodio)
         self.db.commit()
         self.db.refresh(episodio)
-        return episodio  # Retorna el episodio creado.
+        return episodio
 
     def find_by_id(self, episodio_id: int) -> Episodio | None:
-        return self.db.query(Episodio).filter(Episodio.id == episodio_id).first()  # Busca episodio por id.
+        return self.db.query(Episodio).filter(Episodio.id == episodio_id).first()
 
     def list_by_temporada(self, temporada_id: int) -> list[Episodio]:
         return (
@@ -185,34 +193,30 @@ class EpisodioRepository:
             .filter(Episodio.temporada_id == temporada_id)
             .order_by(Episodio.numero)
             .all()
-        )  # Lista episodios de una temporada ordenados por número.
+        )
 
 
 class VistaRepository:
-    # Repositorio para manejar vistas de perfiles sobre episodios.
     def __init__(self, db: Session):
         self.db = db
 
     def create_or_update(self, perfil_id: int, episodio_id: int, segundos_vistos: int, terminado: bool) -> Vista:
         vista = (
             self.db.query(Vista)
-            .filter(
-                Vista.perfil_id == perfil_id,
-                Vista.episodio_id == episodio_id,
-            )
+            .filter(Vista.perfil_id == perfil_id, Vista.episodio_id == episodio_id)
             .first()
-        )  # Busca si ya existe un registro de vista para ese perfil y episodio.
+        )
 
         if not vista:
-            vista = Vista(perfil_id=perfil_id, episodio_id=episodio_id)  # Crea la vista si no existía.
+            vista = Vista(perfil_id=perfil_id, episodio_id=episodio_id)
             self.db.add(vista)
 
-        vista.segundos_vistos = segundos_vistos  # Actualiza el avance en segundos.
-        vista.terminado = terminado  # Marca si el episodio quedó terminado.
+        vista.segundos_vistos = segundos_vistos
+        vista.terminado = terminado
 
         self.db.commit()
         self.db.refresh(vista)
-        return vista  # Retorna la vista creada o actualizada.
+        return vista
 
     def list_by_perfil(self, perfil_id: int) -> list[Vista]:
         return (
@@ -220,23 +224,22 @@ class VistaRepository:
             .filter(Vista.perfil_id == perfil_id)
             .order_by(Vista.fecha.desc())
             .all()
-        )  # Lista todas las vistas de un perfil por fecha descendente.
+        )
 
     def continuar_viendo(self, perfil_id: int) -> list[Vista]:
         return (
             self.db.query(Vista)
             .filter(
                 Vista.perfil_id == perfil_id,
-                Vista.terminado == False,
+                Vista.terminado.is_(False),
                 Vista.segundos_vistos > 0,
             )
             .order_by(Vista.fecha.desc())
             .all()
-        )  # Devuelve los episodios en progreso para continuar viendo.
+        )
 
 
 class CalificacionRepository:
-    # Repositorio para manejar calificaciones de contenidos.
     def __init__(self, db: Session):
         self.db = db
 
@@ -253,31 +256,20 @@ class CalificacionRepository:
                 Calificacion.contenido_id == contenido_id,
             )
             .first()
-        )  # Busca si ya existe una calificación para ese perfil y contenido.
+        )
 
         if not calificacion:
-            calificacion = Calificacion(
-                perfil_id=perfil_id,
-                contenido_id=contenido_id,
-            )  # Crea la calificación si no existía.
+            calificacion = Calificacion(perfil_id=perfil_id, contenido_id=contenido_id)
             self.db.add(calificacion)
 
-        calificacion.puntaje = puntaje  # Asigna el puntaje recibido.
+        calificacion.puntaje = puntaje
 
         self.db.commit()
         self.db.refresh(calificacion)
-        return calificacion  # Retorna la calificación creada o actualizada.
+        return calificacion
 
     def list_by_contenido(self, contenido_id: int) -> list[Calificacion]:
-        return (
-            self.db.query(Calificacion)
-            .filter(Calificacion.contenido_id == contenido_id)
-            .all()
-        )  # Lista todas las calificaciones de un contenido.
+        return self.db.query(Calificacion).filter(Calificacion.contenido_id == contenido_id).all()
 
     def list_by_perfil(self, perfil_id: int) -> list[Calificacion]:
-        return (
-            self.db.query(Calificacion)
-            .filter(Calificacion.perfil_id == perfil_id)
-            .all()
-        )  # Lista todas las calificaciones hechas por un perfil.
+        return self.db.query(Calificacion).filter(Calificacion.perfil_id == perfil_id).all()

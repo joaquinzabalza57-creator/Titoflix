@@ -32,14 +32,14 @@ class CuentaSchema(BaseModel):
 class CreatePerfilSchema(BaseModel):
     cuenta_id: int                               # ID de la cuenta a la que pertenece el perfil
     nombre: str = Field(min_length=1, max_length=50)  # Nombre del perfil (entre 1 y 50 caracteres)
-    pin: str | None = Field(default=None, min_length=4, max_length=8)  # PIN opcional de exactamente 4 caracteres
+    pin: str | None = Field(default=None, pattern=r"^\d{4}$")  # PIN opcional de 4 digitos
     es_infantil: bool = False                    # Indica si el perfil es infantil (por defecto False)
     avatar: str | None = None                    # URL o referencia del avatar (opcional)
 
 
 class UpdatePerfilSchema(BaseModel):
     nombre: str | None = Field(default=None, min_length=1, max_length=50)  # Nombre opcional (1 a 50 caracteres)
-    pin: str | None = Field(default=None, min_length=4, max_length=8)  # PIN opcional de 4 caracteres
+    pin: str | None = Field(default=None, pattern=r"^\d{4}$")  # PIN opcional de 4 digitos
     es_infantil: bool | None = None                 # Campo opcional para indicar si es perfil infantil
     avatar: str | None = None                       # Avatar opcional (URL o referencia)
 
@@ -48,7 +48,6 @@ class PerfilSchema(BaseModel):
     id: int                                      # ID único del perfil
     cuenta_id: int                               # ID de la cuenta a la que pertenece
     nombre: str                                  # Nombre del perfil
-    pin: str | None = None                       # PIN opcional de la cuenta
     es_infantil: bool                            # Indica si es un perfil infantil
     avatar: str | None = None                    # Avatar opcional (URL o referencia)
 

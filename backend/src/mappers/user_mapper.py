@@ -1,6 +1,5 @@
-from src.db.models.user_model import Cuenta, Perfil                # Importa el modelo de Usuario
-from src.db.models import Cuenta, Perfil                           # Importa modelos de Cuenta y Perfil
-from src.dtos.user_dto import CuentaResponseDTO, PerfilResponseDTO # Importa DTOs de usuario
+from src.db import Cuenta, Perfil                           # Importa modelos de Cuenta y Perfil
+from src.dtos import CuentaResponseDTO, PerfilResponseDTO # Importa DTOs de usuario
 
 def to_cuenta_response(cuenta: Cuenta) -> CuentaResponseDTO:    # Convierte Cuenta a DTO
     """Convierte un Model SQLAlchemy en un DTO de respuesta (sin campos sensibles)."""

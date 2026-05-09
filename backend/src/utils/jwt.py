@@ -3,8 +3,8 @@ from typing import Any
 
 from jose import JWTError, jwt
 
-from src.config.env import settings
-from src.utils.errors import UnauthorizedError
+from src.config import settings
+from src.utils import UnauthorizedError
 
 
 ALGORITHM = settings.JWT_ALGORITHM

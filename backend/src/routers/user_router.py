@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from src.db.connection import get_db
-from src.dtos.user_dto import (
+from src.db import get_db
+from src.dtos import (
     CreateCuentaDTO,
     CreatePerfilDTO,
     CuentaResponseDTO,
@@ -18,7 +18,7 @@ from src.schemas.user_schema import (
 )
 from src.services.user_service import CuentaService, PerfilService
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/cuentas", tags=["cuentas"])
 
 
 @router.post("/", response_model=CuentaResponseDTO, status_code=status.HTTP_201_CREATED)

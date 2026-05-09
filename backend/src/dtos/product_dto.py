@@ -1,6 +1,6 @@
 from datetime import datetime              # Manejo de fechas y horas (aunque no se usa directamente aquí)
 
-from pydantic import BaseModel             # Base para definir DTOs
+from pydantic import BaseModel, Field      # Base para definir DTOs
 
 
 class GeneroResponseDTO(BaseModel):
@@ -17,7 +17,7 @@ class CreateContenidoDTO(BaseModel):
     descripcion: str | None = None           # Descripción opcional
     duracion_min: int | None = None          # Duración en minutos (opcional)
     clasificacion_edad: str                  # Clasificación por edad
-    generos_ids: list[int] = []              # Lista de IDs de géneros asociados
+    generos_ids: list[int] = Field(default_factory=list)  # Lista de IDs de generos asociados
 
 
 class UpdateContenidoDTO(BaseModel):
@@ -38,7 +38,8 @@ class ContenidoResponseDTO(BaseModel):
     descripcion: str | None = None               # Descripción breve (opcional)
     duracion_min: int | None = None              # Duración en minutos (opcional)
     clasificacion_edad: str                      # Clasificación por edad (ATP, +13, etc.)
-    generos: list[GeneroResponseDTO] = []        # Lista de géneros asociados
+    generos: list[GeneroResponseDTO] = Field(default_factory=list)  # Lista de generos asociados
+    promedio_calificaciones: float | None = None
 
     model_config = {"from_attributes": True}     # Permite convertir desde el objeto ORM
 

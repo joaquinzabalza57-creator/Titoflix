@@ -1,10 +1,8 @@
 from sqlalchemy.orm import Session
 
-from src.dtos.auth_dto import LoginDTO, PerfilAuthDTO, TokenDTO
-from src.repositories.user_repository import CuentaRepository, PerfilRepository
-from src.utils.errors import UnauthorizedError
-from src.utils.hash import verify_password
-from src.utils.jwt import create_access_token
+from src.dtos import LoginDTO, PerfilAuthDTO, TokenDTO
+from src.repositories import CuentaRepository, PerfilRepository
+from src.utils import UnauthorizedError, verify_password, create_access_token
 
 
 class AuthService:
@@ -28,7 +26,7 @@ class AuthService:
         if not perfil or perfil.cuenta_id != cuenta_id: # type: ignore
             raise UnauthorizedError("Perfil no autorizado")
 
-        if perfil.pin and dto.pin != perfil.pin: # type: ignore
+        if perfil.pin and (dto.pin is None or not verify_password(dto.pin, perfil.pin)): # type: ignore
             raise UnauthorizedError("PIN invalido")
 
         token = create_access_token({"sub": str(cuenta_id), "perfil_id": str(perfil.id)})

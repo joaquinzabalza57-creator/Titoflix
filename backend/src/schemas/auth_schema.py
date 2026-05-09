@@ -12,9 +12,8 @@ class TokenSchema(BaseModel):
 
 
 class PinSchema(BaseModel):
-    pin: str = Field(min_length=4, max_length=8)
+    pin: str = Field(pattern=r"^\d{4}$")
 
 
 class PerfilAuthSchema(BaseModel):
-    authorization: str | None = None
-    pin: str | None = Field(default=None, min_length=4, max_length=8)
+    pin: str | None = Field(default=None, pattern=r"^\d{4}$")

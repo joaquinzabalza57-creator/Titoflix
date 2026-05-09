@@ -1,5 +1,5 @@
-from src.db.models import Calificacion, Contenido, Episodio, Genero, Temporada, Vista  # Importa modelos ORM
-from src.dtos.product_dto import (                                                  # Importa esquemas de respuesta
+from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, Vista  # Importa modelos ORM
+from src.dtos import (                                                  # Importa esquemas de respuesta
     CalificacionResponseDTO,
     ContenidoResponseDTO,
     EpisodioResponseDTO,
@@ -15,7 +15,14 @@ def to_genero_response(genero: Genero) -> GeneroResponseDTO:                    
 
 
 def to_contenido_response(contenido: Contenido) -> ContenidoResponseDTO:            # Convierte Contenido a DTO
-    return ContenidoResponseDTO.model_validate(contenido)                           # Valida y transforma al esquema
+    dto = ContenidoResponseDTO.model_validate(contenido)                            # Valida y transforma al esquema
+    if contenido.calificaciones:
+        dto.promedio_calificaciones = round(
+            sum(calificacion.puntaje for calificacion in contenido.calificaciones)
+            / len(contenido.calificaciones),
+            2,
+        )
+    return dto
 
 
 def to_product_response(product: Contenido) -> ProductResponseDTO:                  # Convierte Producto a DTO
