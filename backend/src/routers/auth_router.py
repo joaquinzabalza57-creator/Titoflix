@@ -1,5 +1,10 @@
+<<<<<<< HEAD
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+=======
 from fastapi import APIRouter, Depends, Header                      # Importa utilidades de rutas y dependencias
 from sqlalchemy.orm import Session                                  # Importa el tipado para la sesión de BD
+>>>>>>> 4821e80d18f826697bca21192356855f8e5b12eb
 
 from src.db import get_db                                           # Importa la función para obtener la sesión
 from src.dtos import LoginDTO, PerfilAuthDTO, TokenDTO              # Importa objetos de transferencia de datos
@@ -21,10 +26,10 @@ def login(payload: LoginSchema, db: Session = Depends(get_db)):     # Recibe cre
 def auth_perfil(
     perfil_id: int,                                                 # ID del perfil enviado en la URL
     payload: PerfilAuthSchema,                                      # Esquema que puede contener el PIN
-    authorization: str | None = Header(default=None),               # Captura el token del header Authorization
     db: Session = Depends(get_db),                                  # Inyecta la sesión de la base de datos
 ):
-    current_user = get_user_from_authorization(authorization, db)   # Valida que la cuenta esté autenticada
-    dto = PerfilAuthDTO(**payload.model_dump())                     # Mapea los datos de entrada a DTO
+    payload_data = payload.model_dump()
+    current_user = get_user_from_authorization(payload_data["access_token"], db)   # Valida que la cuenta esté autenticada
+    dto = PerfilAuthDTO(pin=payload_data.get("pin"))                               # Mapea los datos de entrada a DTO
     token: TokenDTO = AuthService(db).auth_perfil(current_user.id, perfil_id, dto) # Valida acceso al perfil
-    return TokenSchema(**token.model_dump())                        # Retorna el nuevo token con perfil_id
+    return TokenSchema(**token.model_dump())                                       # Retorna el nuevo token con perfil_id

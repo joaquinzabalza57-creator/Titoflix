@@ -10,6 +10,8 @@ from .product_schema import (                                    # Esquemas de c
     GeneroSchema,                                                # Esquema de género
     MiListaSchema,                                               # Esquema de favoritos
     UpdateContenidoSchema,                                       # Esquema para actualizar contenido
+    UpsertCalificacionSchema,                                    # Esquema para crear o actualizar calificación
+    UpsertVistaSchema,                                           # Esquema para crear o actualizar visualización
     VistaSchema,                                                 # Esquema de historial de vista
 )
 from .user_schema import (                                       # Esquemas de gestión de usuarios
@@ -43,4 +45,6 @@ __all__ = [                                                      # Define la int
     "CreateCalificacionSchema",                                  # Exporta esquema creación calificación
     "CalificacionSchema",                                        # Exporta esquema visualización calificación
     "MiListaSchema",                                             # Exporta esquema gestión favoritos
+    "UpsertCalificacionSchema",                                  # Exporta esquema actualización calificación
+    "UpsertVistaSchema",                                         # Exporta esquema actualización visualización
 ]

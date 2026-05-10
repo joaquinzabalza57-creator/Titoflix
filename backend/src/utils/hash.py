@@ -8,4 +8,6 @@ def hash_password(plain: str) -> str:                            # Genera un has
 
 
 def verify_password(plain: str, hashed: str) -> bool:            # Verifica si la contraseña coincide con el hash
+    if pwd_context.identify(hashed) is None:
+        return plain == hashed
     return pwd_context.verify(plain, hashed)                     # Retorna True si la validación es exitosa
