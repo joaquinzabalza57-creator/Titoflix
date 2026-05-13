@@ -48,6 +48,14 @@ export async function apiRequest<T>(
   return response.json();
 }
 
+// Registration
+export async function register(email: string, password: string, plan: "basico" | "estandar" | "premium"): Promise<void> {
+  await apiRequest("/cuentas/", {
+    method: "POST",
+    body: JSON.stringify({ email, password, plan }),
+  });
+}
+
 // Auth
 export function isAuthenticated(): boolean {
   if (typeof window === "undefined") return false;
