@@ -1,13 +1,20 @@
 FROM node:24-alpine
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
 
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
 COPY . .
-RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+# Run in development mode for hot reload
+CMD ["pnpm", "dev"]
