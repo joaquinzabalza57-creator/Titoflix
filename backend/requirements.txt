@@ -9,3 +9,8 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 alembic==1.13.3
 psycopg2-binary==2.9.10
+python-multipart==0.0.12
+google-api-python-client==2.149.0
+google-auth==2.35.0
+google-auth-httplib2==0.2.0
+requests==2.34.0

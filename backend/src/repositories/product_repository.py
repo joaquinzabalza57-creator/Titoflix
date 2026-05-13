@@ -24,6 +24,15 @@ class GeneroRepository:
     def list_all(self) -> list[Genero]:
         return self.db.query(Genero).order_by(Genero.nombre).all()
 
+    def delete(self, genero_id: int) -> bool:
+        genero = self.find_by_id(genero_id)
+        if not genero:
+            return False
+
+        self.db.delete(genero)
+        self.db.commit()
+        return True
+
 
 class ContenidoRepository:
     def __init__(self, db: Session):
@@ -38,6 +47,10 @@ class ContenidoRepository:
         descripcion: str | None = None,
         duracion_min: int | None = None,
         generos_ids: list[int] | None = None,
+        drive_folder_id: str | None = None,
+        video_drive_file_id: str | None = None,
+        video_mime: str | None = None,
+        video_size: int | None = None,
     ) -> Contenido:
         contenido = Contenido(
             titulo=titulo,
@@ -46,6 +59,10 @@ class ContenidoRepository:
             descripcion=descripcion,
             duracion_min=duracion_min,
             clasificacion_edad=clasificacion_edad,
+            drive_folder_id=drive_folder_id,
+            video_drive_file_id=video_drive_file_id,
+            video_mime=video_mime,
+            video_size=video_size,
         )
 
         if generos_ids:
@@ -154,8 +171,19 @@ class TemporadaRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, contenido_id: int, numero: int, anio: int) -> Temporada:
-        temporada = Temporada(contenido_id=contenido_id, numero=numero, anio=anio)
+    def create(
+        self,
+        contenido_id: int,
+        numero: int,
+        anio: int,
+        drive_folder_id: str | None = None,
+    ) -> Temporada:
+        temporada = Temporada(
+            contenido_id=contenido_id,
+            numero=numero,
+            anio=anio,
+            drive_folder_id=drive_folder_id,
+        )
         self.db.add(temporada)
         self.db.commit()
         self.db.refresh(temporada)
@@ -172,6 +200,15 @@ class TemporadaRepository:
             .all()
         )
 
+    def delete(self, temporada_id: int) -> bool:
+        temporada = self.find_by_id(temporada_id)
+        if not temporada:
+            return False
+
+        self.db.delete(temporada)
+        self.db.commit()
+        return True
+
 
 class EpisodioRepository:
     def __init__(self, db: Session):
@@ -183,12 +220,18 @@ class EpisodioRepository:
         numero: int,
         titulo: str,
         duracion_min: int,
+        video_drive_file_id: str | None = None,
+        video_mime: str | None = None,
+        video_size: int | None = None,
     ) -> Episodio:
         episodio = Episodio(
             temporada_id=temporada_id,
             numero=numero,
             titulo=titulo,
             duracion_min=duracion_min,
+            video_drive_file_id=video_drive_file_id,
+            video_mime=video_mime,
+            video_size=video_size,
         )
         self.db.add(episodio)
         self.db.commit()
@@ -205,6 +248,15 @@ class EpisodioRepository:
             .order_by(Episodio.numero)
             .all()
         )
+
+    def delete(self, episodio_id: int) -> bool:
+        episodio = self.find_by_id(episodio_id)
+        if not episodio:
+            return False
+
+        self.db.delete(episodio)
+        self.db.commit()
+        return True
 
 
 class VistaRepository:
@@ -327,14 +379,7 @@ class CalificacionRepository:
         contenido_id: int,
         puntaje: int,
     ) -> Calificacion:
-        calificacion = (
-            self.db.query(Calificacion)
-            .filter(
-                Calificacion.perfil_id == perfil_id,
-                Calificacion.contenido_id == contenido_id,
-            )
-            .first()
-        )
+        calificacion = self.find_by_perfil_and_contenido(perfil_id, contenido_id)
 
         if not calificacion:
             calificacion = Calificacion(perfil_id=perfil_id, contenido_id=contenido_id)

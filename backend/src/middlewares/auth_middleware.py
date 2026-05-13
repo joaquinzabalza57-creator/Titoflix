@@ -1,15 +1,51 @@
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
 from src.db.models.user_model import Cuenta, Perfil
 from src.repositories.user_repository import CuentaRepository, PerfilRepository
-from src.utils.errors import UnauthorizedError
+from src.utils.errors import ForbiddenError, UnauthorizedError
 from src.utils.jwt import decode_access_token
+
+
+cuenta_auth_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="CuentaAuth",
+    description="Token de cuenta obtenido en /api/v1/auth/login",
+)
+perfil_auth_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="PerfilAuth",
+    description="Token de perfil obtenido en /api/v1/auth/perfiles/{perfil_id}",
+)
 
 
 def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> Cuenta:
     return get_user_from_authorization(authorization, db)
+
+
+def get_current_user_from_swagger(
+    credentials: HTTPAuthorizationCredentials | None = Security(cuenta_auth_scheme),
+    db: Session = Depends(get_db),
+) -> Cuenta:
+    token = credentials.credentials if credentials else None
+    return get_user_from_token(token, db)
+
+
+def get_optional_current_user_from_swagger(
+    credentials: HTTPAuthorizationCredentials | None = Security(cuenta_auth_scheme),
+    db: Session = Depends(get_db),
+) -> Cuenta | None:
+    if credentials is None:
+        return None
+    return get_user_from_token(credentials.credentials, db)
+
+
+def require_admin(current_user: Cuenta = Depends(get_current_user_from_swagger)) -> Cuenta:
+    if not current_user.is_admin:
+        raise ForbiddenError("Solo una cuenta admin puede realizar esta accion")
+    return current_user
 
 
 def get_user_from_authorization(authorization: str | None, db: Session) -> Cuenta:
@@ -60,3 +96,11 @@ def get_profile_from_authorization(access_token: str | None, db: Session) -> Per
         raise UnauthorizedError("Profile token no longer matches an existing profile")
 
     return perfil
+
+
+def get_current_profile_from_swagger(
+    credentials: HTTPAuthorizationCredentials | None = Security(perfil_auth_scheme),
+    db: Session = Depends(get_db),
+) -> Perfil:
+    token = credentials.credentials if credentials else None
+    return get_profile_from_authorization(token, db)

@@ -1,4 +1,4 @@
-from .auth_dto import LoginDTO, PerfilAuthDTO, PinDTO, TokenDTO
+from .auth_dto import LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, PinDTO, TokenDTO
 from .product_dto import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
@@ -30,6 +30,7 @@ __all__ = [
     "LoginDTO",
     "PinDTO",
     "PerfilAuthDTO",
+    "PerfilAuthResponseDTO",
     "TokenDTO",
     "CreateCuentaDTO",
     "UpdateCuentaDTO",

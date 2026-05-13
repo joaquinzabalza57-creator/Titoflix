@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
 
-from src.dtos import LoginDTO, PerfilAuthDTO, TokenDTO           # Importa DTOs de autenticación
+from src.dtos import LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, TokenDTO # Importa DTOs de autenticación
 from src.repositories import CuentaRepository, PerfilRepository # Importa repositorios necesarios
 from src.utils import UnauthorizedError, verify_password, create_access_token # Utilidades de seguridad
 
@@ -20,7 +20,7 @@ class AuthService:                                               # Servicio para
 
         return TokenDTO(access_token=token, token_type="bearer") # Retorna DTO con el token generado
 
-    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> TokenDTO: # Valida acceso a perfil
+    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> PerfilAuthResponseDTO: # Valida acceso a perfil
         perfil = self.perfil_repo.find_by_id(perfil_id)          # Busca el perfil solicitado
 
         if not perfil or perfil.cuenta_id != cuenta_id:          # Valida pertenencia del perfil a la cuenta
@@ -29,6 +29,8 @@ class AuthService:                                               # Servicio para
         if perfil.pin and (dto.pin is None or not verify_password(dto.pin, perfil.pin)): # Valida PIN si existe
             raise UnauthorizedError("PIN invalido")              # Error de PIN incorrecto o ausente
 
-        token = create_access_token({"sub": str(cuenta_id), "perfil_id": str(perfil.id)}) # Genera JWT con perfil_id
-
-        return TokenDTO(access_token=token, token_type="bearer") # Retorna DTO con token de acceso a perfil
+        return PerfilAuthResponseDTO(
+            message="Perfil autorizado",
+            perfil_id=perfil.id,
+            cuenta_id=cuenta_id,
+        )

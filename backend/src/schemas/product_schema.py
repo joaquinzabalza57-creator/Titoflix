@@ -62,13 +62,13 @@ class CreateEpisodioSchema(BaseModel):
 
 
 class UpsertVistaSchema(BaseModel):
-    access_token: str = Field(min_length=1)
+    episodio_id: int | None = None
+    contenido_id: int | None = None
     segundos_vistos: int = Field(default=0, ge=0)
     terminado: bool = False
 
 
 class UpsertCalificacionSchema(BaseModel):
-    access_token: str = Field(min_length=1)
     puntaje: int = Field(ge=1, le=5)
 
 

@@ -17,3 +17,9 @@ class PinDTO(BaseModel):
 
 class PerfilAuthDTO(BaseModel):
     pin: str | None = None
+
+
+class PerfilAuthResponseDTO(BaseModel):
+    message: str
+    perfil_id: int
+    cuenta_id: int

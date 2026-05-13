@@ -1,4 +1,4 @@
-from .auth_schema import LoginSchema, PerfilAuthSchema, PinSchema, TokenSchema # Esquemas de autenticación
+from .auth_schema import LoginSchema, PerfilAuthResponseSchema, PerfilAuthSchema, PinSchema, TokenSchema # Esquemas de autenticación
 from .product_schema import (                                    # Esquemas de catálogo y productos
     CalificacionSchema,                                          # Esquema de respuesta calificación
     ContenidoSchema,                                             # Esquema de respuesta contenido
@@ -10,8 +10,6 @@ from .product_schema import (                                    # Esquemas de c
     GeneroSchema,                                                # Esquema de género
     MiListaSchema,                                               # Esquema de favoritos
     UpdateContenidoSchema,                                       # Esquema para actualizar contenido
-    UpsertCalificacionSchema,                                    # Esquema para crear o actualizar calificación
-    UpsertVistaSchema,                                           # Esquema para crear o actualizar visualización
     VistaSchema,                                                 # Esquema de historial de vista
 )
 from .user_schema import (                                       # Esquemas de gestión de usuarios
@@ -27,6 +25,7 @@ __all__ = [                                                      # Define la int
     "LoginSchema",                                               # Exporta esquema login
     "PinSchema",                                                 # Exporta esquema de validación PIN
     "PerfilAuthSchema",                                          # Exporta esquema auth de perfil
+    "PerfilAuthResponseSchema",                                  # Exporta respuesta auth de perfil
     "TokenSchema",                                               # Exporta esquema de respuesta JWT
     "CreateCuentaSchema",                                        # Exporta esquema registro
     "UpdateCuentaSchema",                                        # Exporta esquema edición cuenta
@@ -45,6 +44,4 @@ __all__ = [                                                      # Define la int
     "CreateCalificacionSchema",                                  # Exporta esquema creación calificación
     "CalificacionSchema",                                        # Exporta esquema visualización calificación
     "MiListaSchema",                                             # Exporta esquema gestión favoritos
-    "UpsertCalificacionSchema",                                  # Exporta esquema actualización calificación
-    "UpsertVistaSchema",                                         # Exporta esquema actualización visualización
 ]

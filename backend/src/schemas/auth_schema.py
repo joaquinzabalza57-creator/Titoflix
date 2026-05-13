@@ -16,5 +16,10 @@ class PinSchema(BaseModel):                                     # Esquema para v
 
 
 class PerfilAuthSchema(BaseModel):                              # Esquema para acceso protegido a un perfil
-    access_token: str = Field(min_length=1)
     pin: str | None = Field(default=None, pattern=r"^\d{4}$")   # PIN opcional (regex para 4 dígitos numéricos)
+
+
+class PerfilAuthResponseSchema(BaseModel):                      # Respuesta al validar acceso a un perfil
+    message: str                                                # Mensaje de confirmación
+    perfil_id: int                                              # Perfil validado
+    cuenta_id: int                                              # Cuenta dueña del perfil

@@ -7,8 +7,13 @@ class CuentaRepository:
     def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
         self.db = db
 
-    def create(self, email: str, password_hash: str, plan: str) -> Cuenta: # Crea y persiste una nueva cuenta
-        cuenta = Cuenta(email=email, password_hash=password_hash, plan=plan)
+    def create(self, email: str, password_hash: str, plan: str, is_admin: bool = False) -> Cuenta: # Crea y persiste una nueva cuenta
+        cuenta = Cuenta(
+            email=email,
+            password_hash=password_hash,
+            plan=plan,
+            is_admin=is_admin,
+        )
         self.db.add(cuenta)
         self.db.commit()                                                 # Guarda cambios en la base de datos
         self.db.refresh(cuenta)                                          # Actualiza la instancia con datos de DB
