@@ -19,11 +19,9 @@ from .user_mapper import (
     to_cuenta_response_list,         # Mapper para lista de Cuentas
     to_perfil_response,              # Mapper para Perfil individual
     to_perfil_response_list,         # Mapper para lista de Perfiles
-    to_user_response,                # Mapper para Usuario individual
 )
 
 __all__ = [
-    "to_user_response",              # Exporta mapper de Usuario
     "to_cuenta_response",            # Exporta mapper de Cuenta
     "to_cuenta_response_list",       # Exporta lista de Cuentas
     "to_perfil_response",            # Exporta mapper de Perfil

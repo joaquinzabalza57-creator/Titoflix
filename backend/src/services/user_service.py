@@ -1,6 +1,7 @@
+from typing import cast
 from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
 
-from src.dtos.user_dto import (                                  # Importa DTOs de Usuario
+from src.dtos import (                                  # Importa DTOs de Usuario
     CreateCuentaDTO,                                             # DTO para creación de Cuenta
     CreatePerfilDTO,                                             # DTO para creación de Perfil
     CuentaResponseDTO,                                           # DTO para respuesta de Cuenta
@@ -8,17 +9,17 @@ from src.dtos.user_dto import (                                  # Importa DTOs 
     UpdateCuentaDTO,                                             # DTO para actualización de Cuenta
     UpdatePerfilDTO,                                             # DTO para actualización de Perfil
 )
-from src.mappers.user_mapper import (                         # Importa funciones de mapeo de usuario
+from src.mappers import (                         # Importa funciones de mapeo de usuario
     to_cuenta_response,                                      # Mapper de Cuenta a DTO
     to_cuenta_response_list,                                 # Mapper de lista de Cuentas a DTOs
     to_perfil_response,                                      # Mapper de Perfil a DTO
     to_perfil_response_list,                                 # Mapper de lista de Perfiles a DTOs
 )
-from src.repositories.user_repository import CuentaRepository, PerfilRepository                                        
+from src.repositories import CuentaRepository, PerfilRepository                                        
 # Importa repositorios de datos
 # Repositorio para Cuentas y para Perfiles
 
-from src.utils.errors import ConflictError, NotFoundError    # Importa excepciones personalizadas
+from src.utils import ConflictError, NotFoundError, hash_password
 
 
 PLAN_LIMITS = {                                      # Define los límites de perfiles permitidos por plan
@@ -31,17 +32,20 @@ PLAN_LIMITS = {                                      # Define los límites de pe
 class CuentaService:                                            # Servicio para lógica de negocio de Cuentas
     def __init__(self, db: Session):                            # Inicializa el servicio con sesión de BD
         self.cuenta_repo = CuentaRepository(db)                 # Instancia el repositorio de Cuentas
+        self.perfil_repo = PerfilRepository(db)
 
     def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO: # Crea una nueva cuenta
         existing = self.cuenta_repo.find_by_email(dto.email)    # Verifica si el email ya está registrado
 
         if existing:                                            # Si ya existe, lanza error de conflicto
             raise ConflictError("Ya existe una cuenta con ese email")
+        
+        password_hash = hash_password(dto.password)
 
         cuenta = self.cuenta_repo.create(                       # Persiste la nueva cuenta
             email=dto.email,
+            password_hash=password_hash,
             plan=dto.plan,
-            pin=dto.pin,
         )
 
         return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
@@ -60,6 +64,19 @@ class CuentaService:                                            # Servicio para 
 
     def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO: # Actualiza datos de una cuenta
         fields = dto.model_dump(exclude_unset=True)             # Extrae solo los campos enviados
+
+        if "email" in fields:
+            existing = self.cuenta_repo.find_by_email(fields["email"])
+            if existing and existing.id != cuenta_id:
+                raise ConflictError("Ya existe una cuenta con ese email")
+
+        if "password" in fields:
+            fields["password_hash"] = hash_password(fields.pop("password"))
+
+        if "plan" in fields:
+            perfiles = self.perfil_repo.list_by_cuenta(cuenta_id)
+            if len(perfiles) > PLAN_LIMITS[fields["plan"]]:
+                raise ConflictError("La cuenta tiene mas perfiles que los permitidos por ese plan")
 
         cuenta = self.cuenta_repo.update(cuenta_id, **fields)   # Realiza la actualización
 
@@ -87,7 +104,7 @@ class PerfilService:                                            # Servicio para 
             raise NotFoundError("Cuenta no encontrada")
 
         perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id) # Obtiene perfiles actuales de la cuenta
-        max_perfiles = PLAN_LIMITS[cuenta.plan]                 # Determina límite según plan de suscripción
+        max_perfiles = PLAN_LIMITS[cast(str, cuenta.plan)]       # Determina límite según plan de suscripción
 
         if len(perfiles) >= max_perfiles:                       # Valida límite de perfiles permitidos
             raise ConflictError("El plan no permite crear más perfiles")
@@ -97,9 +114,12 @@ class PerfilService:                                            # Servicio para 
         if repeated_name:                                       # Evita duplicidad de nombres en la cuenta
             raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
 
+        pin_hash = hash_password(dto.pin) if dto.pin else None
+
         perfil = self.perfil_repo.create(                       # Persiste el nuevo perfil
             cuenta_id=dto.cuenta_id,
             nombre=dto.nombre,
+            pin=pin_hash,
             es_infantil=dto.es_infantil,
             avatar=dto.avatar,
         )
@@ -125,6 +145,22 @@ class PerfilService:                                            # Servicio para 
 
     def update(self, perfil_id: int, dto: UpdatePerfilDTO) -> PerfilResponseDTO: # Actualiza datos del perfil
         fields = dto.model_dump(exclude_unset=True)             # Filtra solo campos proporcionados
+
+        perfil_actual = self.perfil_repo.find_by_id(perfil_id)
+        if not perfil_actual:
+            raise NotFoundError("Perfil no encontrado")
+
+        if "nombre" in fields:
+            perfiles = self.perfil_repo.list_by_cuenta(perfil_actual.cuenta_id)
+            repeated_name = any(
+                perfil.id != perfil_id and perfil.nombre == fields["nombre"]
+                for perfil in perfiles
+            )
+            if repeated_name:
+                raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
+
+        if "pin" in fields:
+            fields["pin"] = hash_password(fields["pin"]) if fields["pin"] else None
 
         perfil = self.perfil_repo.update(perfil_id, **fields)   # Aplica cambios
 
