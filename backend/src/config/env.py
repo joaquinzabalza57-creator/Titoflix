@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "cambiame-en-produccion"   # Clave secreta para firmar tokens JWT
     JWT_ALGORITHM: str = "HS256"                # Algoritmo de encriptación para JWT
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60       # Tiempo de expiración del token (en minutos)
+    GOOGLE_DRIVE_CREDENTIALS_FILE: str | None = None
+    GOOGLE_DRIVE_ROOT_FOLDER_ID: str = "1rbVi-Gpq0-wNA8Oe-Ya3A34Pw-NilrdB"
+    LOCAL_MEDIA_ROOT: str = "storage/media"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

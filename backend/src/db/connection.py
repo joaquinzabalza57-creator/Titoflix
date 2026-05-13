@@ -1,35 +1,33 @@
-from sqlalchemy import create_engine, inspect, text         # Función para crear la conexión a la Base de Datos
-from sqlalchemy.orm import declarative_base, sessionmaker   # Base para modelos ORM y fábrica de sesiones
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-from src.config.env import settings               # Importa configuración (ej: DATABASE_URL)
+from src.config.env import settings
 
-engine = create_engine(settings.DATABASE_URL)     # Crea el engine de conexión usando la URL de la Base de Datos
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)  
-# Configura las conexiones con la base de datos de las sesiones
-Base = declarative_base()                         
-# Clase base para definir los modelos ORM (Object Relational Mapping, usar los objetos en python directo en lugar de SQL directo)
+
+engine = create_engine(settings.DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+Base = declarative_base()
 
 
 def get_db():
-    """Dependency de FastAPI: abre una sesión por request y la cierra al final."""
-    db = SessionLocal()                           # Crea una nueva sesión de base de datos
+    """Dependency de FastAPI: abre una sesion por request y la cierra al final."""
+    db = SessionLocal()
     try:
-        yield db                                  # Devuelve la sesión para usarla en el endpoint
+        yield db
     finally:
-        db.close()                                # Cierra la sesión al finalizar el request
+        db.close()
 
-# ============================================================================
-# FUNCIONES ÚTILES PARA DESARROLLO
-# ============================================================================
+
 def create_tables():
-    """Crea todas las tablas en la BD (útil para inicialización)."""
-    Base.metadata.create_all(bind=engine)        # Crea todas las tablas definidas en los modelos
-    ensure_account_admin_column()                # Agrega columnas nuevas en bases ya existentes
-    print("✅ Tablas creadas exitosamente")      # Mensaje de confirmación
+    """Crea todas las tablas en la BD y agrega columnas nuevas en bases existentes."""
+    Base.metadata.create_all(bind=engine)
+    ensure_account_admin_column()
+    ensure_drive_media_columns()
+    print("Tablas creadas exitosamente")
 
 
 def ensure_account_admin_column():
-    """Agrega is_admin a cuentas si la tabla ya existía antes de este cambio."""
+    """Agrega is_admin a cuentas si la tabla ya existia antes de este cambio."""
     inspector = inspect(engine)
     if not inspector.has_table("cuentas"):
         return
@@ -44,13 +42,56 @@ def ensure_account_admin_column():
         )
 
 
+def ensure_drive_media_columns():
+    """Agrega columnas de Google Drive si las tablas ya existian."""
+    inspector = inspect(engine)
+    table_columns = {
+        table_name: {column["name"] for column in inspector.get_columns(table_name)}
+        for table_name in ("contenidos", "temporadas", "episodios")
+        if inspector.has_table(table_name)
+    }
+
+    statements = []
+    if "contenidos" in table_columns:
+        columns = table_columns["contenidos"]
+        if "drive_folder_id" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN drive_folder_id VARCHAR")
+        if "video_drive_file_id" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN video_drive_file_id VARCHAR")
+        if "video_mime" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN video_mime VARCHAR")
+        if "video_size" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN video_size BIGINT")
+
+    if "temporadas" in table_columns:
+        columns = table_columns["temporadas"]
+        if "drive_folder_id" not in columns:
+            statements.append("ALTER TABLE temporadas ADD COLUMN drive_folder_id VARCHAR")
+
+    if "episodios" in table_columns:
+        columns = table_columns["episodios"]
+        if "video_drive_file_id" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN video_drive_file_id VARCHAR")
+        if "video_mime" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN video_mime VARCHAR")
+        if "video_size" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN video_size BIGINT")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
 def drop_tables():
-    """Elimina todas las tablas (⚠️ PELIGROSO - borra datos)."""
-    Base.metadata.drop_all(bind=engine)          # Elimina todas las tablas de la base de datos
-    print("⚠️ Todas las tablas eliminadas")     # Mensaje de advertencia
+    """Elimina todas las tablas. Peligroso: borra datos."""
+    Base.metadata.drop_all(bind=engine)
+    print("Todas las tablas eliminadas")
 
 
 def reset_database():
     """Reinicia la BD: elimina y recrea todas las tablas."""
-    drop_tables()                                # Borra todas las tablas existentes
-    create_tables()                              # Vuelve a crearlas desde cero
+    drop_tables()
+    create_tables()

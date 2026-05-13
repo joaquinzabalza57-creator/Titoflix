@@ -47,6 +47,10 @@ class ContenidoRepository:
         descripcion: str | None = None,
         duracion_min: int | None = None,
         generos_ids: list[int] | None = None,
+        drive_folder_id: str | None = None,
+        video_drive_file_id: str | None = None,
+        video_mime: str | None = None,
+        video_size: int | None = None,
     ) -> Contenido:
         contenido = Contenido(
             titulo=titulo,
@@ -55,6 +59,10 @@ class ContenidoRepository:
             descripcion=descripcion,
             duracion_min=duracion_min,
             clasificacion_edad=clasificacion_edad,
+            drive_folder_id=drive_folder_id,
+            video_drive_file_id=video_drive_file_id,
+            video_mime=video_mime,
+            video_size=video_size,
         )
 
         if generos_ids:
@@ -163,8 +171,19 @@ class TemporadaRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, contenido_id: int, numero: int, anio: int) -> Temporada:
-        temporada = Temporada(contenido_id=contenido_id, numero=numero, anio=anio)
+    def create(
+        self,
+        contenido_id: int,
+        numero: int,
+        anio: int,
+        drive_folder_id: str | None = None,
+    ) -> Temporada:
+        temporada = Temporada(
+            contenido_id=contenido_id,
+            numero=numero,
+            anio=anio,
+            drive_folder_id=drive_folder_id,
+        )
         self.db.add(temporada)
         self.db.commit()
         self.db.refresh(temporada)
@@ -201,12 +220,18 @@ class EpisodioRepository:
         numero: int,
         titulo: str,
         duracion_min: int,
+        video_drive_file_id: str | None = None,
+        video_mime: str | None = None,
+        video_size: int | None = None,
     ) -> Episodio:
         episodio = Episodio(
             temporada_id=temporada_id,
             numero=numero,
             titulo=titulo,
             duracion_min=duracion_min,
+            video_drive_file_id=video_drive_file_id,
+            video_mime=video_mime,
+            video_size=video_size,
         )
         self.db.add(episodio)
         self.db.commit()
