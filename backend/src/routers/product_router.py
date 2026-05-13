@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from src.db import get_db
-from src.middlewares import get_profile_from_authorization
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
@@ -34,29 +33,22 @@ from src.services.product_service import (
     TemporadaService,
     VistaService,
 )
-from src.utils import ForbiddenError
 
 
 router = APIRouter(tags=["products"])
 
 
-def _profile_id_from_token(access_token: str | None, db: Session, expected_profile_id: int | None = None) -> int:
-    perfil = get_profile_from_authorization(access_token, db)
-    if expected_profile_id is not None and perfil.id != expected_profile_id:
-        raise ForbiddenError("El token no pertenece a este perfil")
-
-    return perfil.id
-
-
 def _vista_dto_from_request(
     perfil_id: int,
     payload: UpsertVistaSchema,
-    db: Session,
     episodio_id: int | None = None,
     contenido_id: int | None = None,
 ) -> CreateVistaDTO:
     payload_data = payload.model_dump()
-    _profile_id_from_token(payload_data.pop("access_token"), db, perfil_id)
+    payload_episodio_id = payload_data.pop("episodio_id")
+    payload_contenido_id = payload_data.pop("contenido_id")
+    episodio_id = episodio_id if episodio_id is not None else payload_episodio_id
+    contenido_id = contenido_id if contenido_id is not None else payload_contenido_id
     return CreateVistaDTO(
         perfil_id=perfil_id,
         episodio_id=episodio_id,
@@ -69,10 +61,8 @@ def _calificacion_dto_from_request(
     perfil_id: int,
     contenido_id: int,
     payload: UpsertCalificacionSchema,
-    db: Session,
 ) -> CreateCalificacionDTO:
     payload_data = payload.model_dump()
-    _profile_id_from_token(payload_data.pop("access_token"), db, perfil_id)
     return CreateCalificacionDTO(
         perfil_id=perfil_id,
         contenido_id=contenido_id,
@@ -112,13 +102,9 @@ def search_contenidos(
     genero_id: int | None = None,
     genero: str | None = None,
     perfil_id: int | None = None,
-    access_token: str | None = None,
     ordenar: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    if access_token is not None or perfil_id is not None:
-        perfil_id = _profile_id_from_token(access_token, db, perfil_id)
-
     return ContenidoService(db).search(
         q=q,
         tipo=tipo,
@@ -188,118 +174,60 @@ def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
 
 
 @router.post(
-    "/perfiles/{perfil_id}/vistas/contenidos/{contenido_id}",
+    "/perfiles/{perfil_id}/vistas",
     response_model=VistaResponseDTO,
     status_code=status.HTTP_201_CREATED,
 )
-def create_vista_contenido(
+def create_vista_recurso(
     perfil_id: int,
-    contenido_id: int,
     payload: UpsertVistaSchema,
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
         perfil_id=perfil_id,
-        contenido_id=contenido_id,
         payload=payload,
-        db=db,
     )
-    return VistaService(db).create(dto)
+    return VistaService(db).create_or_update(dto)
 
 
 @router.put(
-    "/perfiles/{perfil_id}/vistas/contenidos/{contenido_id}",
+    "/perfiles/{perfil_id}/vistas",
     response_model=VistaResponseDTO,
 )
-def update_vista_contenido(
+def update_vista_recurso(
     perfil_id: int,
-    contenido_id: int,
     payload: UpsertVistaSchema,
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
         perfil_id=perfil_id,
+        payload=payload,
+    )
+    return VistaService(db).create_or_update(dto)
+
+
+@router.delete(
+    "/perfiles/{perfil_id}/vistas",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_vista_recurso(
+    perfil_id: int,
+    episodio_id: int | None = None,
+    contenido_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    VistaService(db).delete(
+        perfil_id=perfil_id,
+        episodio_id=episodio_id,
         contenido_id=contenido_id,
-        payload=payload,
-        db=db,
     )
-    return VistaService(db).update(dto)
-
-
-@router.delete(
-    "/perfiles/{perfil_id}/vistas/contenidos/{contenido_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def delete_vista_contenido(
-    perfil_id: int,
-    contenido_id: int,
-    access_token: str,
-    db: Session = Depends(get_db),
-):
-    _profile_id_from_token(access_token, db, perfil_id)
-    VistaService(db).delete(perfil_id=perfil_id, contenido_id=contenido_id)
-
-
-@router.post(
-    "/perfiles/{perfil_id}/vistas/{episodio_id}",
-    response_model=VistaResponseDTO,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_vista(
-    perfil_id: int,
-    episodio_id: int,
-    payload: UpsertVistaSchema,
-    db: Session = Depends(get_db),
-):
-    dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
-        episodio_id=episodio_id,
-        payload=payload,
-        db=db,
-    )
-    return VistaService(db).create(dto)
-
-
-@router.put(
-    "/perfiles/{perfil_id}/vistas/{episodio_id}",
-    response_model=VistaResponseDTO,
-)
-def update_vista(
-    perfil_id: int,
-    episodio_id: int,
-    payload: UpsertVistaSchema,
-    db: Session = Depends(get_db),
-):
-    dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
-        episodio_id=episodio_id,
-        payload=payload,
-        db=db,
-    )
-    return VistaService(db).update(dto)
-
-
-@router.delete(
-    "/perfiles/{perfil_id}/vistas/{episodio_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def delete_vista(
-    perfil_id: int,
-    episodio_id: int,
-    access_token: str,
-    db: Session = Depends(get_db),
-):
-    _profile_id_from_token(access_token, db, perfil_id)
-    VistaService(db).delete(perfil_id=perfil_id, episodio_id=episodio_id)
 
 
 @router.get("/perfiles/{perfil_id}/continuar", response_model=list[VistaResponseDTO])
 def continuar_viendo(
     perfil_id: int,
-    access_token: str,
     db: Session = Depends(get_db),
 ):
-    _profile_id_from_token(access_token, db, perfil_id)
     return VistaService(db).continuar_viendo(perfil_id)
 
 
@@ -307,20 +235,16 @@ def continuar_viendo(
 def add_to_mi_lista(
     perfil_id: int,
     contenido_id: int,
-    access_token: str,
     db: Session = Depends(get_db),
 ):
-    _profile_id_from_token(access_token, db, perfil_id)
     return MiListaService(db).add(perfil_id, contenido_id)
 
 
 @router.get("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def get_mi_lista(
     perfil_id: int,
-    access_token: str,
     db: Session = Depends(get_db),
 ):
-    _profile_id_from_token(access_token, db, perfil_id)
     return MiListaService(db).list(perfil_id)
 
 
@@ -328,10 +252,8 @@ def get_mi_lista(
 def remove_from_mi_lista(
     perfil_id: int,
     contenido_id: int,
-    access_token: str,
     db: Session = Depends(get_db),
 ):
-    _profile_id_from_token(access_token, db, perfil_id)
     return MiListaService(db).remove(perfil_id, contenido_id)
 
 
@@ -346,8 +268,8 @@ def create_calificacion(
     payload: UpsertCalificacionSchema,
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload, db)
-    return CalificacionService(db).create(dto)
+    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    return CalificacionService(db).create_or_update(dto)
 
 
 @router.put(
@@ -360,8 +282,8 @@ def update_calificacion(
     payload: UpsertCalificacionSchema,
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload, db)
-    return CalificacionService(db).update(dto)
+    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    return CalificacionService(db).create_or_update(dto)
 
 
 @router.delete(
@@ -371,8 +293,6 @@ def update_calificacion(
 def delete_calificacion(
     perfil_id: int,
     contenido_id: int,
-    access_token: str,
     db: Session = Depends(get_db),
 ):
-    _profile_id_from_token(access_token, db, perfil_id)
     CalificacionService(db).delete(perfil_id, contenido_id)

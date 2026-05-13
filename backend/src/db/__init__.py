@@ -1,7 +1,7 @@
 # ============================================================================
 # IMPORTS DE CONEXIÓN Y SESIONES
 # ============================================================================
-from .connection import Base, get_db, engine, SessionLocal
+from .connection import Base, get_db, engine, SessionLocal, create_tables, drop_tables, reset_database
 
 # ============================================================================
 # IMPORTS DE TODOS LOS MODELOS
@@ -28,7 +28,9 @@ __all__ = [
     "get_db", 
     "engine",
     "SessionLocal",
-    
+    "create_tables",
+    "drop_tables",
+    "reset_database",
     # Modelos
     "Cuenta",
     "Perfil", 

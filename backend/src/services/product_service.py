@@ -180,28 +180,79 @@ class EpisodioService:                                           # Servicio para
 class VistaService:                                              # Servicio para Progreso de Visualización
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
+        self.contenido_repo = ContenidoRepository(db)
         self.episodio_repo = EpisodioRepository(db)
         self.vista_repo = VistaRepository(db)
 
+    def create(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        return self.create_or_update(dto)
+
+    def update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        return self.create_or_update(dto)
+
     def create_or_update(self, dto: CreateVistaDTO) -> VistaResponseDTO: # Registra progreso
         perfil = self.perfil_repo.find_by_id(dto.perfil_id)
-        episodio = self.episodio_repo.find_by_id(dto.episodio_id)
         if not perfil: raise NotFoundError("Perfil no encontrado")
-        if not episodio: raise NotFoundError("Episodio no encontrado")
 
-        if perfil.es_infantil and episodio.temporada.contenido.clasificacion_edad != "ATP": # Control parental
+        if (dto.episodio_id is None and dto.contenido_id is None) or (
+            dto.episodio_id is not None and dto.contenido_id is not None
+        ):
+            raise ConflictError("La vista debe indicar un episodio o un contenido")
+
+        episodio = None
+        contenido = None
+        duracion_min = None
+
+        if dto.episodio_id is not None:
+            episodio = self.episodio_repo.find_by_id(dto.episodio_id)
+            if not episodio: raise NotFoundError("Episodio no encontrado")
+            contenido = episodio.temporada.contenido
+            duracion_min = episodio.duracion_min
+
+        if dto.contenido_id is not None:
+            contenido = self.contenido_repo.find_by_id(dto.contenido_id)
+            if not contenido: raise NotFoundError("Contenido no encontrado")
+            if contenido.tipo != "pelicula":
+                raise ConflictError("Las series deben registrarse por episodio")
+            if contenido.duracion_min is None:
+                raise ConflictError("El contenido no tiene duracion definida")
+            duracion_min = contenido.duracion_min
+
+        if perfil.es_infantil and contenido.clasificacion_edad != "ATP": # Control parental
             raise ForbiddenError("El perfil infantil no puede ver este contenido")
 
-        duracion_seg = episodio.duracion_min * 60               # Valida tiempo máximo
+        duracion_seg = duracion_min * 60                        # Valida tiempo máximo
         if dto.segundos_vistos > duracion_seg:
             raise ConflictError("Los segundos vistos superan la duracion")
 
         terminado = dto.terminado or dto.segundos_vistos >= duracion_seg * 0.9 # Marca terminado al 90%
         vista = self.vista_repo.create_or_update(               # Persiste en BD
-            perfil_id=dto.perfil_id, episodio_id=dto.episodio_id,
+            perfil_id=dto.perfil_id,
+            episodio_id=dto.episodio_id,
+            contenido_id=dto.contenido_id,
             segundos_vistos=dto.segundos_vistos, terminado=terminado
         )
         return to_vista_response(vista)
+
+    def delete(
+        self,
+        perfil_id: int,
+        episodio_id: int | None = None,
+        contenido_id: int | None = None,
+    ) -> None:
+        if not self.perfil_repo.find_by_id(perfil_id): raise NotFoundError("Perfil no encontrado")
+        if (episodio_id is None and contenido_id is None) or (
+            episodio_id is not None and contenido_id is not None
+        ):
+            raise ConflictError("La vista debe indicar un episodio o un contenido")
+
+        deleted = self.vista_repo.delete(
+            perfil_id=perfil_id,
+            episodio_id=episodio_id,
+            contenido_id=contenido_id,
+        )
+        if not deleted:
+            raise NotFoundError("Vista no encontrada")
 
     def continuar_viendo(self, perfil_id: int) -> list[VistaResponseDTO]: # Obtiene recientes
         if not self.perfil_repo.find_by_id(perfil_id): raise NotFoundError("Perfil no encontrado")
@@ -250,10 +301,32 @@ class CalificacionService:                                       # Servicio para
         if not self.contenido_repo.find_by_id(dto.contenido_id): raise NotFoundError("Contenido no encontrado")
 
         vistas = self.vista_repo.list_by_perfil(dto.perfil_id)  # Valida que haya empezado a verlo
-        empezo = any(v.episodio.temporada.contenido_id == dto.contenido_id and v.segundos_vistos > 0 for v in vistas)
+        empezo = any(
+            (
+                v.contenido_id == dto.contenido_id
+                or (
+                    v.episodio is not None
+                    and v.episodio.temporada.contenido_id == dto.contenido_id
+                )
+            )
+            and v.segundos_vistos > 0
+            for v in vistas
+        )
         if not empezo: raise ConflictError("Solo se puede calificar contenido empezado")
 
         calif = self.calificacion_repo.create_or_update(        # Persiste calif (1-5 estrellas)
             perfil_id=dto.perfil_id, contenido_id=dto.contenido_id, puntaje=dto.puntaje
         )
         return to_calificacion_response(calif)
+
+    def create(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        return self.create_or_update(dto)
+
+    def update(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
+        return self.create_or_update(dto)
+
+    def delete(self, perfil_id: int, contenido_id: int) -> None:
+        if not self.perfil_repo.find_by_id(perfil_id): raise NotFoundError("Perfil no encontrado")
+        if not self.contenido_repo.find_by_id(contenido_id): raise NotFoundError("Contenido no encontrado")
+        if not self.calificacion_repo.delete(perfil_id, contenido_id):
+            raise NotFoundError("Calificacion no encontrada")
