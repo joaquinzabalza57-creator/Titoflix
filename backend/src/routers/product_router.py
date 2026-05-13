@@ -36,24 +36,18 @@ from src.services.product_service import (
     TemporadaService,
     VistaService,
 )
-from src.services.drive_service import DriveService
+from src.services.storage_service import StorageService
 
 
 router = APIRouter(tags=["products"])
 
 
-def _stream_drive_video(file_id: str, mime_type: str, request: Request) -> StreamingResponse:
-    stream = DriveService().stream_file(
-        file_id=file_id,
+def _stream_storage_video(file_id: str, mime_type: str, request: Request) -> StreamingResponse:
+    stream = StorageService().stream_file(
+        object_key=file_id,
         range_header=request.headers.get("range"),
         fallback_mime_type=mime_type,
     )
-
-
-def _drive_preview_url(file_id: str) -> str | None:
-    if file_id.startswith("local:"):
-        return None
-    return f"https://drive.google.com/file/d/{file_id}/preview"
     return StreamingResponse(
         stream.chunks,
         status_code=stream.status_code,
@@ -186,7 +180,6 @@ def get_contenido_playback(contenido_id: int, db: Session = Depends(get_db)):
     video = ContenidoService(db).get_video_source(contenido_id)
     return {
         "stream_url": f"/api/v1/contenidos/{contenido_id}/stream",
-        "drive_preview_url": _drive_preview_url(video.file_id),
         "mime_type": video.mime_type,
     }
 
@@ -198,7 +191,7 @@ def stream_contenido_video(
     db: Session = Depends(get_db),
 ):
     video = ContenidoService(db).get_video_source(contenido_id)
-    return _stream_drive_video(video.file_id, video.mime_type, request)
+    return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
 @router.put("/contenidos/{contenido_id}", response_model=ContenidoResponseDTO)
@@ -285,7 +278,6 @@ def get_episodio_playback(episodio_id: int, db: Session = Depends(get_db)):
     video = EpisodioService(db).get_video_source(episodio_id)
     return {
         "stream_url": f"/api/v1/episodios/{episodio_id}/stream",
-        "drive_preview_url": _drive_preview_url(video.file_id),
         "mime_type": video.mime_type,
     }
 
@@ -297,7 +289,7 @@ def stream_episodio_video(
     db: Session = Depends(get_db),
 ):
     video = EpisodioService(db).get_video_source(episodio_id)
-    return _stream_drive_video(video.file_id, video.mime_type, request)
+    return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
 @router.delete("/episodios/{episodio_id}", status_code=status.HTTP_204_NO_CONTENT)

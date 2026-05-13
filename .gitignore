@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
-backend/google-drive-service-account.json
 backend/storage/
+.env
+.next/
+node_modules/

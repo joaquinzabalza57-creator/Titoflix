@@ -18,8 +18,8 @@ class CreateContenidoDTO(BaseModel):
     duracion_min: int | None = None
     clasificacion_edad: str
     generos_ids: list[int] = Field(default_factory=list)
-    drive_folder_id: str | None = None
-    video_drive_file_id: str | None = None
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
 
@@ -44,8 +44,8 @@ class ContenidoResponseDTO(BaseModel):
     clasificacion_edad: str
     generos: list[GeneroResponseDTO] = Field(default_factory=list)
     promedio_calificaciones: float | None = None
-    drive_folder_id: str | None = None
-    video_drive_file_id: str | None = None
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
 
@@ -56,7 +56,7 @@ class CreateTemporadaDTO(BaseModel):
     contenido_id: int
     numero: int
     anio: int
-    drive_folder_id: str | None = None
+    storage_folder_id: str | None = None
 
 
 class TemporadaResponseDTO(BaseModel):
@@ -64,7 +64,7 @@ class TemporadaResponseDTO(BaseModel):
     contenido_id: int
     numero: int
     anio: int
-    drive_folder_id: str | None = None
+    storage_folder_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -74,7 +74,7 @@ class CreateEpisodioDTO(BaseModel):
     numero: int
     titulo: str
     duracion_min: int
-    video_drive_file_id: str | None = None
+    video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
 
@@ -85,7 +85,7 @@ class EpisodioResponseDTO(BaseModel):
     numero: int
     titulo: str
     duracion_min: int
-    video_drive_file_id: str | None = None
+    video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
 

@@ -36,7 +36,7 @@ from src.repositories import (
     VistaRepository,
 )
 from src.repositories import PerfilRepository
-from src.services.drive_service import DriveService
+from src.services.storage_service import StorageService
 from src.utils import ConflictError, ForbiddenError, NotFoundError
 
 
@@ -89,15 +89,15 @@ class ContenidoService:
             generos_ids=dto.generos_ids,
         )
 
-        drive = DriveService()
-        folder_id = drive.create_folder(dto.titulo)
+        storage = StorageService()
+        folder_id = storage.create_folder(dto.titulo)
         video = None
 
         if dto.tipo == "pelicula":
             if video_file is None:
                 raise ConflictError("Una pelicula debe incluir un archivo de video")
             self._validate_video_file(video_file)
-            video = drive.upload_video(
+            video = storage.upload_video(
                 file=video_file.file,
                 filename=video_file.filename or f"{dto.titulo}.mp4",
                 mime_type=video_file.content_type or "video/mp4",
@@ -114,8 +114,8 @@ class ContenidoService:
             duracion_min=dto.duracion_min,
             clasificacion_edad=dto.clasificacion_edad,
             generos_ids=dto.generos_ids,
-            drive_folder_id=folder_id,
-            video_drive_file_id=video.file_id if video else None,
+            storage_folder_id=folder_id,
+            video_storage_key=video.object_key if video else None,
             video_mime=video.mime_type if video else None,
             video_size=video.size if video else None,
         )
@@ -176,11 +176,11 @@ class ContenidoService:
             raise NotFoundError("Contenido no encontrado")
         if contenido.tipo != "pelicula":
             raise ConflictError("Las series se reproducen por episodio")
-        if not contenido.video_drive_file_id:
+        if not contenido.video_storage_key:
             raise NotFoundError("Video no encontrado")
 
         return VideoSourceDTO(
-            file_id=contenido.video_drive_file_id,
+            file_id=contenido.video_storage_key,
             mime_type=contenido.video_mime or "video/mp4",
             filename=contenido.titulo,
         )
@@ -214,19 +214,19 @@ class TemporadaService:
             raise NotFoundError("Contenido no encontrado")
         if contenido.tipo != "serie":
             raise ConflictError("Solo las series pueden tener temporadas")
-        if not contenido.drive_folder_id:
-            raise ConflictError("La serie no tiene carpeta de Google Drive asociada")
+        if not contenido.storage_folder_id:
+            raise ConflictError("La serie no tiene carpeta de storage asociada")
 
-        folder_id = DriveService().create_folder(
+        folder_id = StorageService().create_folder(
             name=f"Temporada {dto.numero}",
-            parent_folder_id=contenido.drive_folder_id,
+            parent_folder_id=contenido.storage_folder_id,
         )
 
         temporada = self.temporada_repo.create(
             contenido_id=dto.contenido_id,
             numero=dto.numero,
             anio=dto.anio,
-            drive_folder_id=folder_id,
+            storage_folder_id=folder_id,
         )
         return to_temporada_response(temporada)
 
@@ -259,8 +259,8 @@ class EpisodioService:
         temporada = self.temporada_repo.find_by_id(dto.temporada_id)
         if not temporada:
             raise NotFoundError("Temporada no encontrada")
-        if not temporada.drive_folder_id:
-            raise ConflictError("La temporada no tiene carpeta de Google Drive asociada")
+        if not temporada.storage_folder_id:
+            raise ConflictError("La temporada no tiene carpeta de storage asociada")
         if video_file is None:
             raise ConflictError("Un episodio debe incluir un archivo de video")
 
@@ -268,11 +268,11 @@ class EpisodioService:
         if not content_type.startswith("video/"):
             raise ConflictError("El archivo debe ser un video")
 
-        video = DriveService().upload_video(
+        video = StorageService().upload_video(
             file=video_file.file,
             filename=video_file.filename or f"episodio-{dto.numero}.mp4",
             mime_type=video_file.content_type or "video/mp4",
-            parent_folder_id=temporada.drive_folder_id,
+            parent_folder_id=temporada.storage_folder_id,
         )
 
         episodio = self.episodio_repo.create(
@@ -280,7 +280,7 @@ class EpisodioService:
             numero=dto.numero,
             titulo=dto.titulo,
             duracion_min=dto.duracion_min,
-            video_drive_file_id=video.file_id,
+            video_storage_key=video.object_key,
             video_mime=video.mime_type,
             video_size=video.size,
         )
@@ -302,11 +302,11 @@ class EpisodioService:
         episodio = self.episodio_repo.find_by_id(episodio_id)
         if not episodio:
             raise NotFoundError("Episodio no encontrado")
-        if not episodio.video_drive_file_id:
+        if not episodio.video_storage_key:
             raise NotFoundError("Video no encontrado")
 
         return VideoSourceDTO(
-            file_id=episodio.video_drive_file_id,
+            file_id=episodio.video_storage_key,
             mime_type=episodio.video_mime or "video/mp4",
             filename=episodio.titulo,
         )

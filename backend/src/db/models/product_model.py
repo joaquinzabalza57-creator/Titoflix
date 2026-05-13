@@ -56,8 +56,8 @@ class Contenido(Base):
     descripcion = Column(String, nullable=True)
     duracion_min = Column(Integer, nullable=True)
     clasificacion_edad = Column(String, nullable=False)
-    drive_folder_id = Column(String, nullable=True)
-    video_drive_file_id = Column(String, nullable=True)
+    storage_folder_id = Column(String, nullable=True)
+    video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
     video_size = Column(BigInteger, nullable=True)
 
@@ -95,7 +95,7 @@ class Temporada(Base):
     contenido_id = Column(Integer, ForeignKey("contenidos.id"), nullable=False)
     numero = Column(Integer, nullable=False)
     anio = Column(Integer, nullable=False)
-    drive_folder_id = Column(String, nullable=True)
+    storage_folder_id = Column(String, nullable=True)
 
     contenido = relationship("Contenido", back_populates="temporadas")
     episodios = relationship(
@@ -117,7 +117,7 @@ class Episodio(Base):
     numero = Column(Integer, nullable=False)
     titulo = Column(String, nullable=False)
     duracion_min = Column(Integer, nullable=False)
-    video_drive_file_id = Column(String, nullable=True)
+    video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
     video_size = Column(BigInteger, nullable=True)
 

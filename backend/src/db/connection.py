@@ -22,7 +22,7 @@ def create_tables():
     """Crea todas las tablas en la BD y agrega columnas nuevas en bases existentes."""
     Base.metadata.create_all(bind=engine)
     ensure_account_admin_column()
-    ensure_drive_media_columns()
+    ensure_storage_media_columns()
     print("Tablas creadas exitosamente")
 
 
@@ -42,8 +42,8 @@ def ensure_account_admin_column():
         )
 
 
-def ensure_drive_media_columns():
-    """Agrega columnas de Google Drive si las tablas ya existian."""
+def ensure_storage_media_columns():
+    """Agrega columnas de storage si las tablas ya existian."""
     inspector = inspect(engine)
     table_columns = {
         table_name: {column["name"] for column in inspector.get_columns(table_name)}
@@ -54,10 +54,10 @@ def ensure_drive_media_columns():
     statements = []
     if "contenidos" in table_columns:
         columns = table_columns["contenidos"]
-        if "drive_folder_id" not in columns:
-            statements.append("ALTER TABLE contenidos ADD COLUMN drive_folder_id VARCHAR")
-        if "video_drive_file_id" not in columns:
-            statements.append("ALTER TABLE contenidos ADD COLUMN video_drive_file_id VARCHAR")
+        if "storage_folder_id" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN storage_folder_id VARCHAR")
+        if "video_storage_key" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN video_storage_key VARCHAR")
         if "video_mime" not in columns:
             statements.append("ALTER TABLE contenidos ADD COLUMN video_mime VARCHAR")
         if "video_size" not in columns:
@@ -65,13 +65,13 @@ def ensure_drive_media_columns():
 
     if "temporadas" in table_columns:
         columns = table_columns["temporadas"]
-        if "drive_folder_id" not in columns:
-            statements.append("ALTER TABLE temporadas ADD COLUMN drive_folder_id VARCHAR")
+        if "storage_folder_id" not in columns:
+            statements.append("ALTER TABLE temporadas ADD COLUMN storage_folder_id VARCHAR")
 
     if "episodios" in table_columns:
         columns = table_columns["episodios"]
-        if "video_drive_file_id" not in columns:
-            statements.append("ALTER TABLE episodios ADD COLUMN video_drive_file_id VARCHAR")
+        if "video_storage_key" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN video_storage_key VARCHAR")
         if "video_mime" not in columns:
             statements.append("ALTER TABLE episodios ADD COLUMN video_mime VARCHAR")
         if "video_size" not in columns:
