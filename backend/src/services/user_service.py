@@ -46,6 +46,7 @@ class CuentaService:                                            # Servicio para 
             email=dto.email,
             password_hash=password_hash,
             plan=dto.plan,
+            is_admin=dto.is_admin,
         )
 
         return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada

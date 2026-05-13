@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine                        # Función para crear la conexión a la Base de Datos
+from sqlalchemy import create_engine, inspect, text         # Función para crear la conexión a la Base de Datos
 from sqlalchemy.orm import declarative_base, sessionmaker   # Base para modelos ORM y fábrica de sesiones
 
 from src.config.env import settings               # Importa configuración (ej: DATABASE_URL)
@@ -24,7 +24,24 @@ def get_db():
 def create_tables():
     """Crea todas las tablas en la BD (útil para inicialización)."""
     Base.metadata.create_all(bind=engine)        # Crea todas las tablas definidas en los modelos
+    ensure_account_admin_column()                # Agrega columnas nuevas en bases ya existentes
     print("✅ Tablas creadas exitosamente")      # Mensaje de confirmación
+
+
+def ensure_account_admin_column():
+    """Agrega is_admin a cuentas si la tabla ya existía antes de este cambio."""
+    inspector = inspect(engine)
+    if not inspector.has_table("cuentas"):
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("cuentas")}
+    if "is_admin" in column_names:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE cuentas ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE")
+        )
 
 
 def drop_tables():

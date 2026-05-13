@@ -12,18 +12,21 @@ class CreateCuentaSchema(BaseModel):
     email: EmailStr                              # Email válido (validado automáticamente)
     password: str = Field(min_length=8, max_length=72)
     plan: PlanType                               # Tipo de plan (basico, estandar, premium)
+    is_admin: bool = False                       # Indica si la cuenta puede administrar catálogo
 
 
 class UpdateCuentaSchema(BaseModel):
     email: EmailStr | None = None                 # Email opcional (solo si se quiere actualizar)
     password: str | None = Field(default=None, min_length=8, max_length=72)
     plan: PlanType | None = None                  # Plan opcional (basico, estandar, premium)
+    is_admin: bool | None = None                  # Admin opcional
 
 
 class CuentaSchema(BaseModel):
     id: int                                      # ID único de la cuenta
     email: EmailStr                              # Email válido de la cuenta
     plan: PlanType                               # Tipo de plan (basico, estandar, premium)
+    is_admin: bool                               # Indica si la cuenta es admin
     fecha_alta: datetime | None = None           # Fecha de creación de la cuenta
     
     model_config = {"from_attributes": True}     # Permite crear el schema desde objetos ORM (SQLAlchemy)

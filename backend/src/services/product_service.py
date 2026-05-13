@@ -55,6 +55,10 @@ class GeneroService:                                             # Servicio para
     def list_all(self) -> list[GeneroResponseDTO]:              # Lista todos los géneros
         return to_genero_response_list(self.genero_repo.list_all())
 
+    def delete(self, genero_id: int) -> None:
+        if not self.genero_repo.delete(genero_id):
+            raise NotFoundError("Genero no encontrado")
+
 
 class ContenidoService:                                          # Servicio para gestión de Películas/Series
     def __init__(self, db: Session):                            # Inicializa repositorios
@@ -155,6 +159,10 @@ class TemporadaService:                                          # Servicio para
             raise NotFoundError("Contenido no encontrado")
         return [to_temporada_response(t) for t in self.temporada_repo.list_by_contenido(contenido_id)]
 
+    def delete(self, temporada_id: int) -> None:
+        if not self.temporada_repo.delete(temporada_id):
+            raise NotFoundError("Temporada no encontrada")
+
 
 class EpisodioService:                                           # Servicio para Episodios
     def __init__(self, db: Session):
@@ -175,6 +183,10 @@ class EpisodioService:                                           # Servicio para
         if not self.temporada_repo.find_by_id(temporada_id):
             raise NotFoundError("Temporada no encontrada")
         return [to_episodio_response(e) for e in self.episodio_repo.list_by_temporada(temporada_id)]
+
+    def delete(self, episodio_id: int) -> None:
+        if not self.episodio_repo.delete(episodio_id):
+            raise NotFoundError("Episodio no encontrado")
 
 
 class VistaService:                                              # Servicio para Progreso de Visualización

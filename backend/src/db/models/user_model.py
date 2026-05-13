@@ -12,6 +12,7 @@ class Cuenta(Base):                                           # Modelo de datos 
     email = Column(String, unique=True, nullable=False)       # Email único para inicio de sesión
     password_hash = Column(String, nullable=False)
     plan = Column(String, nullable=False)                     # Tipo de plan suscrito (ej. básico, premium)
+    is_admin = Column(Boolean, default=False, nullable=False)  # Permite administrar catálogo sin perfil
     fecha_alta = Column(DateTime, server_default=func.now())  # Fecha y hora de creación automática
 
     perfiles = relationship(                                  # Relación 1:N con Perfil

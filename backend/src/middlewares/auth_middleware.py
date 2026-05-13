@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from src.db.connection import get_db
 from src.db.models.user_model import Cuenta, Perfil
 from src.repositories.user_repository import CuentaRepository, PerfilRepository
-from src.utils.errors import UnauthorizedError
+from src.utils.errors import ForbiddenError, UnauthorizedError
 from src.utils.jwt import decode_access_token
 
 
@@ -31,6 +31,21 @@ def get_current_user_from_swagger(
 ) -> Cuenta:
     token = credentials.credentials if credentials else None
     return get_user_from_token(token, db)
+
+
+def get_optional_current_user_from_swagger(
+    credentials: HTTPAuthorizationCredentials | None = Security(cuenta_auth_scheme),
+    db: Session = Depends(get_db),
+) -> Cuenta | None:
+    if credentials is None:
+        return None
+    return get_user_from_token(credentials.credentials, db)
+
+
+def require_admin(current_user: Cuenta = Depends(get_current_user_from_swagger)) -> Cuenta:
+    if not current_user.is_admin:
+        raise ForbiddenError("Solo una cuenta admin puede realizar esta accion")
+    return current_user
 
 
 def get_user_from_authorization(authorization: str | None, db: Session) -> Cuenta:

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from src.db import get_db
+from src.db.models import Cuenta
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
@@ -16,6 +17,7 @@ from src.dtos import (
     UpdateContenidoDTO,
     VistaResponseDTO,
 )
+from src.middlewares import require_admin
 from src.schemas.product_schema import (
     CreateContenidoSchema,
     CreateEpisodioSchema,
@@ -75,7 +77,11 @@ def _calificacion_dto_from_request(
     response_model=GeneroResponseDTO,
     status_code=status.HTTP_201_CREATED,
 )
-def create_genero(nombre: str, db: Session = Depends(get_db)):
+def create_genero(
+    nombre: str,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     return GeneroService(db).create(nombre)
 
 
@@ -84,12 +90,25 @@ def list_generos(db: Session = Depends(get_db)):
     return GeneroService(db).list_all()
 
 
+@router.delete("/generos/{genero_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_genero(
+    genero_id: int,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    GeneroService(db).delete(genero_id)
+
+
 @router.post(
     "/contenidos",
     response_model=ContenidoResponseDTO,
     status_code=status.HTTP_201_CREATED,
 )
-def create_contenido(payload: CreateContenidoSchema, db: Session = Depends(get_db)):
+def create_contenido(
+    payload: CreateContenidoSchema,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     dto = CreateContenidoDTO(**payload.model_dump())
 
     return ContenidoService(db).create(dto)
@@ -129,6 +148,7 @@ def get_contenido(contenido_id: int, db: Session = Depends(get_db)):
 def update_contenido(
     contenido_id: int,
     payload: UpdateContenidoSchema,
+    _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     dto = UpdateContenidoDTO(**payload.model_dump(exclude_unset=True))
@@ -137,7 +157,11 @@ def update_contenido(
 
 
 @router.delete("/contenidos/{contenido_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_contenido(contenido_id: int, db: Session = Depends(get_db)):
+def delete_contenido(
+    contenido_id: int,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     ContenidoService(db).delete(contenido_id)
 
 
@@ -146,7 +170,11 @@ def delete_contenido(contenido_id: int, db: Session = Depends(get_db)):
     response_model=TemporadaResponseDTO,
     status_code=status.HTTP_201_CREATED,
 )
-def create_temporada(payload: CreateTemporadaSchema, db: Session = Depends(get_db)):
+def create_temporada(
+    payload: CreateTemporadaSchema,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     dto = CreateTemporadaDTO(**payload.model_dump())
 
     return TemporadaService(db).create(dto)
@@ -157,12 +185,25 @@ def list_temporadas(contenido_id: int, db: Session = Depends(get_db)):
     return TemporadaService(db).list_by_contenido(contenido_id)
 
 
+@router.delete("/temporadas/{temporada_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_temporada(
+    temporada_id: int,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    TemporadaService(db).delete(temporada_id)
+
+
 @router.post(
     "/episodios",
     response_model=EpisodioResponseDTO,
     status_code=status.HTTP_201_CREATED,
 )
-def create_episodio(payload: CreateEpisodioSchema, db: Session = Depends(get_db)):
+def create_episodio(
+    payload: CreateEpisodioSchema,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     dto = CreateEpisodioDTO(**payload.model_dump())
 
     return EpisodioService(db).create(dto)
@@ -171,6 +212,15 @@ def create_episodio(payload: CreateEpisodioSchema, db: Session = Depends(get_db)
 @router.get("/temporadas/{temporada_id}/episodios", response_model=list[EpisodioResponseDTO])
 def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
     return EpisodioService(db).list_by_temporada(temporada_id)
+
+
+@router.delete("/episodios/{episodio_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_episodio(
+    episodio_id: int,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    EpisodioService(db).delete(episodio_id)
 
 
 @router.post(
