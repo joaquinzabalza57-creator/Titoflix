@@ -1,5 +1,5 @@
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, Vista
 
@@ -95,12 +95,23 @@ class ContenidoRepository:
         return query.all()
 
     def top(self, limit: int = 10, genero: str | None = None) -> list[Contenido]:
+        vista_contenido = aliased(Vista)
+        vista_episodio = aliased(Vista)
+        total_vistas = (
+            func.count(func.distinct(vista_contenido.id))
+            + func.count(func.distinct(vista_episodio.id))
+        )
+
         query = (
             self.db.query(Contenido)
-            .join(Contenido.temporadas)
-            .join(Temporada.episodios)
-            .join(Episodio.vistas)
-            .filter(Vista.terminado.is_(True))
+            .outerjoin(vista_contenido, vista_contenido.contenido_id == Contenido.id)
+            .outerjoin(Temporada, Temporada.contenido_id == Contenido.id)
+            .outerjoin(Episodio, Episodio.temporada_id == Temporada.id)
+            .outerjoin(vista_episodio, vista_episodio.episodio_id == Episodio.id)
+            .filter(
+                (vista_contenido.terminado.is_(True))
+                | (vista_episodio.terminado.is_(True))
+            )
         )
 
         if genero:
@@ -108,7 +119,7 @@ class ContenidoRepository:
 
         return (
             query.group_by(Contenido.id)
-            .order_by(func.count(Vista.id).desc(), Contenido.titulo.asc())
+            .order_by(total_vistas.desc(), Contenido.titulo.asc())
             .limit(limit)
             .all()
         )
@@ -200,15 +211,54 @@ class VistaRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_or_update(self, perfil_id: int, episodio_id: int, segundos_vistos: int, terminado: bool) -> Vista:
-        vista = (
+    def find_by_perfil_and_episodio(self, perfil_id: int, episodio_id: int) -> Vista | None:
+        return (
             self.db.query(Vista)
             .filter(Vista.perfil_id == perfil_id, Vista.episodio_id == episodio_id)
             .first()
         )
 
+    def find_by_perfil_and_contenido(self, perfil_id: int, contenido_id: int) -> Vista | None:
+        return (
+            self.db.query(Vista)
+            .filter(Vista.perfil_id == perfil_id, Vista.contenido_id == contenido_id)
+            .first()
+        )
+
+    def find_existing(
+        self,
+        perfil_id: int,
+        episodio_id: int | None = None,
+        contenido_id: int | None = None,
+    ) -> Vista | None:
+        if episodio_id is not None:
+            return self.find_by_perfil_and_episodio(perfil_id, episodio_id)
+
+        if contenido_id is not None:
+            return self.find_by_perfil_and_contenido(perfil_id, contenido_id)
+
+        return None
+
+    def create_or_update(
+        self,
+        perfil_id: int,
+        segundos_vistos: int,
+        terminado: bool,
+        episodio_id: int | None = None,
+        contenido_id: int | None = None,
+    ) -> Vista:
+        vista = self.find_existing(
+            perfil_id=perfil_id,
+            episodio_id=episodio_id,
+            contenido_id=contenido_id,
+        )
+
         if not vista:
-            vista = Vista(perfil_id=perfil_id, episodio_id=episodio_id)
+            vista = Vista(
+                perfil_id=perfil_id,
+                episodio_id=episodio_id,
+                contenido_id=contenido_id,
+            )
             self.db.add(vista)
 
         vista.segundos_vistos = segundos_vistos
@@ -226,6 +276,24 @@ class VistaRepository:
             .all()
         )
 
+    def delete(
+        self,
+        perfil_id: int,
+        episodio_id: int | None = None,
+        contenido_id: int | None = None,
+    ) -> bool:
+        vista = self.find_existing(
+            perfil_id=perfil_id,
+            episodio_id=episodio_id,
+            contenido_id=contenido_id,
+        )
+        if not vista:
+            return False
+
+        self.db.delete(vista)
+        self.db.commit()
+        return True
+
     def continuar_viendo(self, perfil_id: int) -> list[Vista]:
         return (
             self.db.query(Vista)
@@ -242,6 +310,16 @@ class VistaRepository:
 class CalificacionRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def find_by_perfil_and_contenido(self, perfil_id: int, contenido_id: int) -> Calificacion | None:
+        return (
+            self.db.query(Calificacion)
+            .filter(
+                Calificacion.perfil_id == perfil_id,
+                Calificacion.contenido_id == contenido_id,
+            )
+            .first()
+        )
 
     def create_or_update(
         self,
@@ -273,3 +351,12 @@ class CalificacionRepository:
 
     def list_by_perfil(self, perfil_id: int) -> list[Calificacion]:
         return self.db.query(Calificacion).filter(Calificacion.perfil_id == perfil_id).all()
+
+    def delete(self, perfil_id: int, contenido_id: int) -> bool:
+        calificacion = self.find_by_perfil_and_contenido(perfil_id, contenido_id)
+        if not calificacion:
+            return False
+
+        self.db.delete(calificacion)
+        self.db.commit()
+        return True
