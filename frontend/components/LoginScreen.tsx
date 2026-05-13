@@ -14,19 +14,19 @@ const PLANS: { id: PlanType; label: string; description: string; features: strin
     id: "basico",
     label: "Basico",
     description: "Para empezar",
-    features: ["1 pantalla", "Calidad HD", "Sin descargas"],
+    features: ["1 perfil", "Calidad HD", "Sin descargas"],
   },
   {
     id: "estandar",
     label: "Estandar",
     description: "Lo mas popular",
-    features: ["2 pantallas", "Calidad Full HD", "Descargas incluidas"],
+    features: ["2 perfiles", "Calidad 1440p", "Descargas incluidas con tope"],
   },
   {
     id: "premium",
     label: "Premium",
     description: "La mejor experiencia",
-    features: ["4 pantallas", "Calidad 4K + HDR", "Descargas ilimitadas"],
+    features: ["4 perfiles", "Calidad 4K + HDR", "Descargas ilimitadas"],
   },
 ];
 
