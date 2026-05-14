@@ -69,6 +69,36 @@ class StorageService:
             size=metadata.get("ContentLength"),
         )
 
+    def upload_file_path(
+        self,
+        file_path: Path,
+        object_key: str,
+        mime_type: str,
+    ) -> StorageFileUploadResult:
+        self.client.upload_file(
+            str(file_path),
+            self.bucket_name,
+            object_key,
+            ExtraArgs={"ContentType": mime_type},
+        )
+        metadata = self.client.head_object(Bucket=self.bucket_name, Key=object_key)
+
+        return StorageFileUploadResult(
+            object_key=object_key,
+            mime_type=metadata.get("ContentType") or mime_type,
+            size=metadata.get("ContentLength"),
+        )
+
+    def upload_video_variant(
+        self,
+        file_path: Path,
+        parent_folder_id: str,
+        quality: str,
+        mime_type: str = "video/mp4",
+    ) -> StorageFileUploadResult:
+        object_key = f"{parent_folder_id.strip('/')}/{self._safe_name(quality)}.mp4".strip("/")
+        return self.upload_file_path(file_path, object_key, mime_type)
+
     def stream_file(
         self,
         object_key: str,

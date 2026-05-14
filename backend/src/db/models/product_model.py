@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Float,
     Integer,
     String,
     Table,
@@ -54,7 +55,7 @@ class Contenido(Base):
     tipo = Column(String, nullable=False)
     anio = Column(Integer, nullable=False)
     descripcion = Column(String, nullable=True)
-    duracion_min = Column(Integer, nullable=True)
+    duracion_min = Column(Float, nullable=True)
     clasificacion_edad = Column(String, nullable=False)
     storage_folder_id = Column(String, nullable=True)
     video_storage_key = Column(String, nullable=True)
@@ -121,7 +122,8 @@ class Episodio(Base):
     temporada_id = Column(Integer, ForeignKey("temporadas.id"), nullable=False)
     numero = Column(Integer, nullable=False)
     titulo = Column(String, nullable=False)
-    duracion_min = Column(Integer, nullable=False)
+    duracion_min = Column(Float, nullable=False)
+    storage_folder_id = Column(String, nullable=True)
     video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
     video_size = Column(BigInteger, nullable=True)

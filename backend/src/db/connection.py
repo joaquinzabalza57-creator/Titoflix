@@ -24,6 +24,7 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     ensure_account_admin_column()
     ensure_storage_media_columns()
+    ensure_duration_columns_are_float()
     ensure_default_admin_account()
     print("Tablas creadas exitosamente")
 
@@ -72,12 +73,42 @@ def ensure_storage_media_columns():
 
     if "episodios" in table_columns:
         columns = table_columns["episodios"]
+        if "storage_folder_id" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN storage_folder_id VARCHAR")
         if "video_storage_key" not in columns:
             statements.append("ALTER TABLE episodios ADD COLUMN video_storage_key VARCHAR")
         if "video_mime" not in columns:
             statements.append("ALTER TABLE episodios ADD COLUMN video_mime VARCHAR")
         if "video_size" not in columns:
             statements.append("ALTER TABLE episodios ADD COLUMN video_size BIGINT")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+def ensure_duration_columns_are_float():
+    """Permite guardar duraciones autodetectadas con decimales de minuto."""
+    inspector = inspect(engine)
+    statements = []
+    for table_name in ("contenidos", "episodios"):
+        if not inspector.has_table(table_name):
+            continue
+
+        columns = {
+            column["name"]: str(column["type"]).lower()
+            for column in inspector.get_columns(table_name)
+        }
+        column_type = columns.get("duracion_min", "")
+        if column_type and "double" not in column_type and "float" not in column_type:
+            statements.append(
+                f"ALTER TABLE {table_name} "
+                "ALTER COLUMN duracion_min TYPE DOUBLE PRECISION "
+                "USING duracion_min::double precision"
+            )
 
     if not statements:
         return

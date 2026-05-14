@@ -39,6 +39,7 @@ export interface Contenido {
   generos?: Genero[];
   promedio_calificacion?: number;
   promedio_calificaciones?: number;
+  storage_folder_id?: string;
   video_storage_key?: string;
   video_mime?: string;
   video_size?: number;
@@ -61,6 +62,7 @@ export interface Episodio {
   temporada_id: number;
   duracion?: number;
   duracion_min?: number;
+  storage_folder_id?: string;
   video_storage_key?: string;
   video_mime?: string;
   video_size?: number;

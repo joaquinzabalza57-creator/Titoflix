@@ -7,6 +7,8 @@ Este proyecto corre con cuatro servicios separados:
 - `postgres`: base de datos PostgreSQL en `localhost:5432`
 - `minio`: storage compatible con S3 para videos, miniaturas, avatars y assets
 
+La imagen del backend instala FFmpeg para detectar la resolucion de cada video subido y generar las variantes de calidad.
+
 ## Requisitos
 
 - Docker Desktop
@@ -26,7 +28,7 @@ Opciones principales:
 - `Ver consola del frontend/backend/postgres/MinIO`: abre logs en vivo del servicio elegido.
 - `Detener servicios`: apaga los contenedores sin borrar volumenes.
 - `Reconstruir e iniciar`: reconstruye imagenes y vuelve a levantar el stack.
-- `Resetear tablas de Postgres`: elimina y vuelve a crear las tablas desde el backend.
+- `Resetear tablas de Postgres y buckets de MinIO`: elimina y vuelve a crear las tablas desde el backend, y vacia/recrea el bucket de medios.
 
 Tambien podes usar Docker Compose directamente:
 
@@ -44,6 +46,8 @@ docker compose exec backend python -c "from src.db import reset_database; reset_
 ```
 
 Ese comando no borra los archivos guardados en MinIO.
+
+La opcion `Resetear tablas de Postgres y buckets de MinIO` de `manager.bat` tambien ejecuta el cliente `mc` para borrar y recrear el bucket `titoflix-media`.
 
 ## URLs
 
@@ -84,6 +88,8 @@ El backend crea las tablas al arrancar. PostgreSQL guarda datos en el volumen `p
 ## Storage S3/MinIO
 
 Se elimino la integracion con Google Drive. Los videos se suben a MinIO usando la API S3 y se guardan en el bucket `titoflix-media`, bajo el prefijo `media`.
+
+Cada pelicula y cada episodio tienen su propia carpeta en MinIO. Al subir un archivo, el backend lo toma como la calidad maxima disponible, detecta su resolucion y duracion con `ffprobe`, y genera con `ffmpeg` las variantes `HD`, `1440p` y `4K` sin pedir la calidad ni la duracion en la pantalla de administracion. Si el archivo fuente no llega a una resolucion alta, esa variante se conserva en la maxima resolucion disponible en vez de hacer upscale.
 
 Los endpoints de playback siguen devolviendo `stream_url` y `mime_type`. La transmision del video pasa por el backend, que lee desde MinIO y respeta requests con header `Range` para reproduccion parcial.
 

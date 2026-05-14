@@ -12,7 +12,6 @@ interface AdminDashboardProps {
 
 type Message = { type: "ok" | "error"; text: string } | null;
 type AdminTab = "crear" | "modificar" | "eliminar";
-type VideoQuality = "HD" | "1440p" | "4K";
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [contenidos, setContenidos] = useState<Contenido[]>([]);
@@ -202,7 +201,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     const tipo = String(form.get("tipo") || "");
     const titulo = String(form.get("titulo") || "").trim();
     const anio = String(form.get("anio") || "").trim();
-    const duracion = String(form.get("duracion_min") || "").trim();
     const generosIds = form.getAll("generos_ids").map(String).filter(Boolean);
 
     if (!titulo) {
@@ -217,19 +215,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       setContenidoFormMessage({ type: "error", text: "Crea y selecciona al menos un genero antes de cargar contenido." });
       return;
     }
-    if (tipo === "pelicula" && (!duracion || Number(duracion) < 1)) {
-      setContenidoFormMessage({ type: "error", text: "Ingresa una duracion valida para la pelicula." });
-      return;
-    }
-
-    if (!String(form.get("duracion_min") || "").trim()) {
-      form.delete("duracion_min");
-    }
     if (!String(form.get("descripcion") || "").trim()) {
       form.delete("descripcion");
     }
     if (form.get("tipo") !== "pelicula") {
-      form.delete("duracion_min");
       form.delete("video");
     }
 
@@ -300,7 +289,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     const temporadaId = String(form.get("temporada_id") || "").trim();
     const numero = String(form.get("numero") || "").trim();
     const titulo = String(form.get("titulo") || "").trim();
-    const duracionMin = String(form.get("duracion_min") || "").trim();
     const video = form.get("video");
 
     if (!temporadaId) {
@@ -313,10 +301,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
     if (!titulo) {
       setEpisodioFormMessage({ type: "error", text: "Ingresa el titulo del episodio." });
-      return;
-    }
-    if (!duracionMin || Number(duracionMin) < 1) {
-      setEpisodioFormMessage({ type: "error", text: "Ingresa una duracion valida para el episodio." });
       return;
     }
     if (!(video instanceof File && video.size > 0)) {
@@ -380,7 +364,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
     const form = new FormData(event.currentTarget);
     const tipo = selectedUpdateContenido.tipo;
-    const duracionValue = String(form.get("duracion_min") || "").trim();
     const generosIds = form.getAll("generos_ids").map((value) => Number(value)).filter(Boolean);
     const video = form.get("video");
 
@@ -388,18 +371,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       setMessage({ type: "error", text: "Cada contenido debe tener al menos un género." });
       return;
     }
-    if (tipo === "pelicula" && (!duracionValue || Number(duracionValue) < 1)) {
-      setMessage({ type: "error", text: "Ingresa una duración válida para la película." });
-      return;
-    }
-
     if (!String(form.get("descripcion") || "").trim()) {
       form.delete("descripcion");
     }
     if (tipo !== "pelicula") {
-      form.delete("duracion_min");
       form.delete("video");
-      form.delete("quality");
     }
     if (video instanceof File && video.size === 0) {
       form.delete("video");
@@ -590,7 +566,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </div>
               {contenidoTipo === "pelicula" && (
                 <>
-                  <input name="duracion_min" type="number" min="1" placeholder="Duracion" className="admin-input" />
                   <FilePicker
                     id="contenido-video"
                     name="video"
@@ -599,7 +574,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     onChange={setContenidoVideoName}
                     required
                   />
-                  <QualitySelect name="quality" label="Calidad del video" />
+                  <p className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+                    Subi el video en la calidad maxima disponible. Titoflix detecta la resolucion y genera automaticamente las versiones necesarias.
+                  </p>
                 </>
               )}
               <textarea name="descripcion" placeholder="Descripcion" className="admin-input min-h-24" />
@@ -680,7 +657,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               )}
               <div className="grid gap-3 md:grid-cols-2">
                 <input name="numero" type="number" min="1" placeholder="Numero" className="admin-input" />
-                <input name="duracion_min" type="number" min="1" placeholder="Duracion min" className="admin-input" />
               </div>
               <input name="titulo" placeholder="Titulo del episodio" className="admin-input" />
               <FilePicker
@@ -691,7 +667,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 onChange={setEpisodioVideoName}
                 required
               />
-              <QualitySelect name="quality" label="Calidad del video" />
+              <p className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+                Subi el video en la calidad maxima disponible. Titoflix detecta la resolucion y genera automaticamente las versiones necesarias.
+              </p>
               <FormMessage message={episodioFormMessage} />
               <button className="admin-button w-fit" type="submit" disabled={creatingEpisodio}>
                 {creatingEpisodio ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
@@ -760,15 +738,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   </div>
                   {selectedUpdateContenido.tipo === "pelicula" && (
                     <>
-                      <input
-                        name="duracion_min"
-                        type="number"
-                        min="1"
-                        placeholder="Duracion"
-                        className="admin-input"
-                        defaultValue={selectedUpdateContenido.duracion_min ?? ""}
-                        required
-                      />
                       <FilePicker
                         id={`update-contenido-video-${selectedUpdateContenido.id}`}
                         name="video"
@@ -776,9 +745,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         fileName={updateContenidoVideoName}
                         onChange={setUpdateContenidoVideoName}
                       />
-                      <QualitySelect name="quality" label="Calidad del video nuevo" />
                       <p className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
-                        Si no elegís un archivo nuevo, se conserva el video actual.
+                        Si no elegis un archivo nuevo, se conserva el video actual. Si lo reemplazas, subi la calidad maxima disponible y se regeneran las variantes.
                       </p>
                     </>
                   )}
@@ -878,7 +846,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 </select>
                 <div className="grid gap-3 md:grid-cols-2">
                   <input name="numero" type="number" min="1" placeholder="Numero" className="admin-input" required />
-                  <input name="duracion_min" type="number" min="1" placeholder="Duracion min" className="admin-input" required />
                 </div>
                 <input name="titulo" placeholder="Titulo" className="admin-input" required />
                 <FilePicker
@@ -888,9 +855,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   fileName={updateEpisodioVideoName}
                   onChange={setUpdateEpisodioVideoName}
                 />
-                <QualitySelect name="quality" label="Calidad del video nuevo" />
                 <p className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
-                  Si no elegís un archivo nuevo, se conserva el video actual.
+                  Si no elegis un archivo nuevo, se conserva el video actual. Si lo reemplazas, subi la calidad maxima disponible y se regeneran las variantes.
                 </p>
                 <button className="admin-button w-fit" type="submit">Guardar episodio</button>
               </form>
@@ -1121,27 +1087,6 @@ function FormMessage({ message }: { message: Message }) {
     >
       {message.text}
     </div>
-  );
-}
-
-function QualitySelect({
-  name,
-  label,
-  defaultValue = "HD",
-}: {
-  name: string;
-  label: string;
-  defaultValue?: VideoQuality;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <select name={name} className="admin-input" defaultValue={defaultValue}>
-        <option value="HD">HD</option>
-        <option value="1440p">1440p</option>
-        <option value="4K">4K</option>
-      </select>
-    </label>
   );
 }
 

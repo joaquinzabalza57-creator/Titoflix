@@ -45,7 +45,7 @@ class ContenidoRepository:
         anio: int,
         clasificacion_edad: str,
         descripcion: str | None = None,
-        duracion_min: int | None = None,
+        duracion_min: float | None = None,
         generos_ids: list[int] | None = None,
         storage_folder_id: str | None = None,
         video_storage_key: str | None = None,
@@ -201,6 +201,31 @@ class VideoVariantRepository:
         self.db.refresh(variant)
         return variant
 
+    def replace_for_contenido(
+        self,
+        contenido_id: int,
+        variants: dict[str, dict],
+    ) -> None:
+        existing = (
+            self.db.query(VideoVariant)
+            .filter(VideoVariant.contenido_id == contenido_id)
+            .all()
+        )
+        for variant in existing:
+            if variant.quality not in variants:
+                self.db.delete(variant)
+
+        for quality, data in variants.items():
+            variant = next((item for item in existing if item.quality == quality), None)
+            if not variant:
+                variant = VideoVariant(contenido_id=contenido_id, quality=quality)
+                self.db.add(variant)
+            variant.video_storage_key = data["video_storage_key"]
+            variant.video_mime = data.get("video_mime")
+            variant.video_size = data.get("video_size")
+
+        self.db.commit()
+
     def upsert_for_episodio(
         self,
         episodio_id: int,
@@ -224,6 +249,31 @@ class VideoVariantRepository:
         self.db.commit()
         self.db.refresh(variant)
         return variant
+
+    def replace_for_episodio(
+        self,
+        episodio_id: int,
+        variants: dict[str, dict],
+    ) -> None:
+        existing = (
+            self.db.query(VideoVariant)
+            .filter(VideoVariant.episodio_id == episodio_id)
+            .all()
+        )
+        for variant in existing:
+            if variant.quality not in variants:
+                self.db.delete(variant)
+
+        for quality, data in variants.items():
+            variant = next((item for item in existing if item.quality == quality), None)
+            if not variant:
+                variant = VideoVariant(episodio_id=episodio_id, quality=quality)
+                self.db.add(variant)
+            variant.video_storage_key = data["video_storage_key"]
+            variant.video_mime = data.get("video_mime")
+            variant.video_size = data.get("video_size")
+
+        self.db.commit()
 
 
 class TemporadaRepository:
@@ -290,7 +340,8 @@ class EpisodioRepository:
         temporada_id: int,
         numero: int,
         titulo: str,
-        duracion_min: int,
+        duracion_min: float,
+        storage_folder_id: str | None = None,
         video_storage_key: str | None = None,
         video_mime: str | None = None,
         video_size: int | None = None,
@@ -300,6 +351,7 @@ class EpisodioRepository:
             numero=numero,
             titulo=titulo,
             duracion_min=duracion_min,
+            storage_folder_id=storage_folder_id,
             video_storage_key=video_storage_key,
             video_mime=video_mime,
             video_size=video_size,

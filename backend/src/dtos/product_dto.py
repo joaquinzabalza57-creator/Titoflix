@@ -25,7 +25,7 @@ class CreateContenidoDTO(BaseModel):
     tipo: str
     anio: int
     descripcion: str | None = None
-    duracion_min: int | None = None
+    duracion_min: float | None = None
     clasificacion_edad: str
     generos_ids: list[int] = Field(default_factory=list)
     storage_folder_id: str | None = None
@@ -39,7 +39,7 @@ class UpdateContenidoDTO(BaseModel):
     tipo: str | None = None
     anio: int | None = None
     descripcion: str | None = None
-    duracion_min: int | None = None
+    duracion_min: float | None = None
     clasificacion_edad: str | None = None
     generos_ids: list[int] | None = None
     video_storage_key: str | None = None
@@ -53,7 +53,7 @@ class ContenidoResponseDTO(BaseModel):
     tipo: str
     anio: int
     descripcion: str | None = None
-    duracion_min: int | None = None
+    duracion_min: float | None = None
     clasificacion_edad: str
     generos: list[GeneroResponseDTO] = Field(default_factory=list)
     promedio_calificaciones: float | None = None
@@ -92,7 +92,8 @@ class CreateEpisodioDTO(BaseModel):
     temporada_id: int
     numero: int
     titulo: str
-    duracion_min: int
+    duracion_min: float | None = None
+    storage_folder_id: str | None = None
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
@@ -101,7 +102,7 @@ class CreateEpisodioDTO(BaseModel):
 class UpdateEpisodioDTO(BaseModel):
     numero: int | None = None
     titulo: str | None = None
-    duracion_min: int | None = None
+    duracion_min: float | None = None
 
 
 class EpisodioResponseDTO(BaseModel):
@@ -109,7 +110,8 @@ class EpisodioResponseDTO(BaseModel):
     temporada_id: int
     numero: int
     titulo: str
-    duracion_min: int
+    duracion_min: float
+    storage_folder_id: str | None = None
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None

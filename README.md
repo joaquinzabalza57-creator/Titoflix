@@ -42,6 +42,8 @@ Al iniciar como admin se abre una consola distinta al home de usuarios. Esa cons
 - Episodios con video
 - Playback de peliculas cargadas
 
+Para peliculas y episodios, se sube un unico archivo en la maxima calidad disponible. El backend usa FFmpeg para detectar la duracion, generar las variantes de calidad y guardarlas juntas en la carpeta propia de esa pelicula o episodio dentro de MinIO.
+
 Ese acceso usa:
 
 ```http
