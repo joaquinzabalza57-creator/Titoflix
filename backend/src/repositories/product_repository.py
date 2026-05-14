@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
 
-from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, Vista
+from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, VideoVariant, Vista
 
 
 class GeneroRepository:
@@ -89,6 +89,7 @@ class ContenidoRepository:
         ordenar: str | None = None,
     ) -> list[Contenido]:
         query = self.db.query(Contenido)
+        needs_distinct = False
 
         if texto:
             query = query.filter(Contenido.titulo.ilike(f"%{texto}%"))
@@ -101,13 +102,18 @@ class ContenidoRepository:
 
         if genero_id:
             query = query.join(Contenido.generos).filter(Genero.id == genero_id)
+            needs_distinct = True
         elif genero:
             query = query.join(Contenido.generos).filter(Genero.nombre.ilike(genero))
+            needs_distinct = True
 
         if ordenar == "anio_desc":
             query = query.order_by(Contenido.anio.desc(), Contenido.titulo.asc())
         else:
             query = query.order_by(Contenido.titulo.asc())
+
+        if needs_distinct:
+            query = query.distinct()
 
         return query.all()
 
@@ -167,6 +173,59 @@ class ContenidoRepository:
         return True
 
 
+class VideoVariantRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def upsert_for_contenido(
+        self,
+        contenido_id: int,
+        quality: str,
+        video_storage_key: str,
+        video_mime: str | None,
+        video_size: int | None,
+    ) -> VideoVariant:
+        variant = (
+            self.db.query(VideoVariant)
+            .filter(VideoVariant.contenido_id == contenido_id, VideoVariant.quality == quality)
+            .first()
+        )
+        if not variant:
+            variant = VideoVariant(contenido_id=contenido_id, quality=quality)
+            self.db.add(variant)
+
+        variant.video_storage_key = video_storage_key
+        variant.video_mime = video_mime
+        variant.video_size = video_size
+        self.db.commit()
+        self.db.refresh(variant)
+        return variant
+
+    def upsert_for_episodio(
+        self,
+        episodio_id: int,
+        quality: str,
+        video_storage_key: str,
+        video_mime: str | None,
+        video_size: int | None,
+    ) -> VideoVariant:
+        variant = (
+            self.db.query(VideoVariant)
+            .filter(VideoVariant.episodio_id == episodio_id, VideoVariant.quality == quality)
+            .first()
+        )
+        if not variant:
+            variant = VideoVariant(episodio_id=episodio_id, quality=quality)
+            self.db.add(variant)
+
+        variant.video_storage_key = video_storage_key
+        variant.video_mime = video_mime
+        variant.video_size = video_size
+        self.db.commit()
+        self.db.refresh(variant)
+        return variant
+
+
 class TemporadaRepository:
     def __init__(self, db: Session):
         self.db = db
@@ -199,6 +258,18 @@ class TemporadaRepository:
             .order_by(Temporada.numero)
             .all()
         )
+
+    def update(self, temporada_id: int, **fields) -> Temporada | None:
+        temporada = self.find_by_id(temporada_id)
+        if not temporada:
+            return None
+
+        for key, value in fields.items():
+            setattr(temporada, key, value)
+
+        self.db.commit()
+        self.db.refresh(temporada)
+        return temporada
 
     def delete(self, temporada_id: int) -> bool:
         temporada = self.find_by_id(temporada_id)
@@ -248,6 +319,18 @@ class EpisodioRepository:
             .order_by(Episodio.numero)
             .all()
         )
+
+    def update(self, episodio_id: int, **fields) -> Episodio | None:
+        episodio = self.find_by_id(episodio_id)
+        if not episodio:
+            return None
+
+        for key, value in fields.items():
+            setattr(episodio, key, value)
+
+        self.db.commit()
+        self.db.refresh(episodio)
+        return episodio
 
     def delete(self, episodio_id: int) -> bool:
         episodio = self.find_by_id(episodio_id)

@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from src.config.env import settings
+from src.utils.hash import hash_password
 
 
 engine = create_engine(settings.DATABASE_URL)
@@ -23,6 +24,7 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     ensure_account_admin_column()
     ensure_storage_media_columns()
+    ensure_default_admin_account()
     print("Tablas creadas exitosamente")
 
 
@@ -83,6 +85,47 @@ def ensure_storage_media_columns():
     with engine.begin() as connection:
         for statement in statements:
             connection.execute(text(statement))
+
+
+def ensure_default_admin_account():
+    """Crea o actualiza la cuenta admin fija para desarrollo."""
+    inspector = inspect(engine)
+    if not inspector.has_table("cuentas"):
+        return
+
+    password_hash = hash_password(settings.ADMIN_PASSWORD)
+    with engine.begin() as connection:
+        existing = connection.execute(
+            text("SELECT id FROM cuentas WHERE email = :email"),
+            {"email": settings.ADMIN_USERNAME},
+        ).first()
+
+        if existing:
+            connection.execute(
+                text(
+                    "UPDATE cuentas "
+                    "SET password_hash = :password_hash, plan = :plan, is_admin = TRUE "
+                    "WHERE email = :email"
+                ),
+                {
+                    "email": settings.ADMIN_USERNAME,
+                    "password_hash": password_hash,
+                    "plan": "premium",
+                },
+            )
+            return
+
+        connection.execute(
+            text(
+                "INSERT INTO cuentas (email, password_hash, plan, is_admin) "
+                "VALUES (:email, :password_hash, :plan, TRUE)"
+            ),
+            {
+                "email": settings.ADMIN_USERNAME,
+                "password_hash": password_hash,
+                "plan": "premium",
+            },
+        )
 
 
 def drop_tables():

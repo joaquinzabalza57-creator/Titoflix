@@ -6,6 +6,11 @@ class LoginDTO(BaseModel):
     password: str
 
 
+class AdminLoginDTO(BaseModel):
+    username: str
+    password: str
+
+
 class TokenDTO(BaseModel):
     access_token: str
     token_type: str = "bearer"

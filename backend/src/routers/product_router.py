@@ -20,10 +20,10 @@ from src.dtos import (
 )
 from src.middlewares import require_admin
 from src.schemas.product_schema import (
-    CreateContenidoSchema,
     CreateEpisodioSchema,
     CreateTemporadaSchema,
-    UpdateContenidoSchema,
+    UpdateEpisodioSchema,
+    UpdateTemporadaSchema,
     UpsertCalificacionSchema,
     UpsertVistaSchema,
 )
@@ -36,6 +36,7 @@ from src.services.product_service import (
     TemporadaService,
     VistaService,
 )
+from src.dtos import UpdateEpisodioDTO, UpdateTemporadaDTO
 from src.services.storage_service import StorageService
 
 
@@ -128,6 +129,7 @@ def create_contenido(
     descripcion: str | None = Form(default=None),
     duracion_min: int | None = Form(default=None),
     generos_ids: list[int] = Form(...),
+    quality: str = Form(default="HD"),
     video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -142,7 +144,7 @@ def create_contenido(
         generos_ids=generos_ids,
     )
 
-    return ContenidoService(db).create_with_video(dto, video)
+    return ContenidoService(db).create_with_video(dto, video, quality)
 
 
 @router.get("/contenidos", response_model=list[ContenidoResponseDTO])
@@ -176,10 +178,10 @@ def get_contenido(contenido_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/contenidos/{contenido_id}/playback")
-def get_contenido_playback(contenido_id: int, db: Session = Depends(get_db)):
-    video = ContenidoService(db).get_video_source(contenido_id)
+def get_contenido_playback(contenido_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+    video = ContenidoService(db).get_video_source(contenido_id, quality)
     return {
-        "stream_url": f"/api/v1/contenidos/{contenido_id}/stream",
+        "stream_url": f"/api/v1/contenidos/{contenido_id}/stream" + (f"?quality={quality}" if quality else ""),
         "mime_type": video.mime_type,
     }
 
@@ -188,22 +190,37 @@ def get_contenido_playback(contenido_id: int, db: Session = Depends(get_db)):
 def stream_contenido_video(
     contenido_id: int,
     request: Request,
+    quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    video = ContenidoService(db).get_video_source(contenido_id)
+    video = ContenidoService(db).get_video_source(contenido_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
 @router.put("/contenidos/{contenido_id}", response_model=ContenidoResponseDTO)
 def update_contenido(
     contenido_id: int,
-    payload: UpdateContenidoSchema,
+    titulo: str = Form(...),
+    anio: int = Form(...),
+    clasificacion_edad: str = Form(...),
+    descripcion: str | None = Form(default=None),
+    duracion_min: int | None = Form(default=None),
+    generos_ids: list[int] = Form(...),
+    quality: str = Form(default="HD"),
+    video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    dto = UpdateContenidoDTO(**payload.model_dump(exclude_unset=True))
+    dto = UpdateContenidoDTO(
+        titulo=titulo,
+        anio=anio,
+        descripcion=descripcion,
+        duracion_min=duracion_min,
+        clasificacion_edad=clasificacion_edad,
+        generos_ids=generos_ids,
+    )
 
-    return ContenidoService(db).update(contenido_id, dto)
+    return ContenidoService(db).update_with_video(contenido_id, dto, video, quality)
 
 
 @router.delete("/contenidos/{contenido_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -244,6 +261,17 @@ def delete_temporada(
     TemporadaService(db).delete(temporada_id)
 
 
+@router.put("/temporadas/{temporada_id}", response_model=TemporadaResponseDTO)
+def update_temporada(
+    temporada_id: int,
+    payload: UpdateTemporadaSchema,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    dto = UpdateTemporadaDTO(**payload.model_dump(exclude_unset=True))
+    return TemporadaService(db).update(temporada_id, dto)
+
+
 @router.post(
     "/episodios",
     response_model=EpisodioResponseDTO,
@@ -254,6 +282,7 @@ def create_episodio(
     numero: int = Form(...),
     titulo: str = Form(...),
     duracion_min: int = Form(...),
+    quality: str = Form(default="HD"),
     video: UploadFile = File(...),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -265,7 +294,7 @@ def create_episodio(
         duracion_min=duracion_min,
     )
 
-    return EpisodioService(db).create_with_video(dto, video)
+    return EpisodioService(db).create_with_video(dto, video, quality)
 
 
 @router.get("/temporadas/{temporada_id}/episodios", response_model=list[EpisodioResponseDTO])
@@ -274,10 +303,10 @@ def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/episodios/{episodio_id}/playback")
-def get_episodio_playback(episodio_id: int, db: Session = Depends(get_db)):
-    video = EpisodioService(db).get_video_source(episodio_id)
+def get_episodio_playback(episodio_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+    video = EpisodioService(db).get_video_source(episodio_id, quality)
     return {
-        "stream_url": f"/api/v1/episodios/{episodio_id}/stream",
+        "stream_url": f"/api/v1/episodios/{episodio_id}/stream" + (f"?quality={quality}" if quality else ""),
         "mime_type": video.mime_type,
     }
 
@@ -286,9 +315,10 @@ def get_episodio_playback(episodio_id: int, db: Session = Depends(get_db)):
 def stream_episodio_video(
     episodio_id: int,
     request: Request,
+    quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    video = EpisodioService(db).get_video_source(episodio_id)
+    video = EpisodioService(db).get_video_source(episodio_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
@@ -299,6 +329,21 @@ def delete_episodio(
     db: Session = Depends(get_db),
 ):
     EpisodioService(db).delete(episodio_id)
+
+
+@router.put("/episodios/{episodio_id}", response_model=EpisodioResponseDTO)
+def update_episodio(
+    episodio_id: int,
+    numero: int = Form(...),
+    titulo: str = Form(...),
+    duracion_min: int = Form(...),
+    quality: str = Form(default="HD"),
+    video: UploadFile | None = File(default=None),
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    dto = UpdateEpisodioDTO(numero=numero, titulo=titulo, duracion_min=duracion_min)
+    return EpisodioService(db).update_with_video(episodio_id, dto, video, quality)
 
 
 @router.post(

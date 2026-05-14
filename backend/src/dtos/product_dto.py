@@ -10,6 +10,16 @@ class GeneroResponseDTO(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VideoVariantResponseDTO(BaseModel):
+    id: int
+    quality: str
+    video_storage_key: str
+    video_mime: str | None = None
+    video_size: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class CreateContenidoDTO(BaseModel):
     titulo: str
     tipo: str
@@ -32,6 +42,9 @@ class UpdateContenidoDTO(BaseModel):
     duracion_min: int | None = None
     clasificacion_edad: str | None = None
     generos_ids: list[int] | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
 
 
 class ContenidoResponseDTO(BaseModel):
@@ -48,6 +61,7 @@ class ContenidoResponseDTO(BaseModel):
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
+    video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -57,6 +71,11 @@ class CreateTemporadaDTO(BaseModel):
     numero: int
     anio: int
     storage_folder_id: str | None = None
+
+
+class UpdateTemporadaDTO(BaseModel):
+    numero: int | None = None
+    anio: int | None = None
 
 
 class TemporadaResponseDTO(BaseModel):
@@ -79,6 +98,12 @@ class CreateEpisodioDTO(BaseModel):
     video_size: int | None = None
 
 
+class UpdateEpisodioDTO(BaseModel):
+    numero: int | None = None
+    titulo: str | None = None
+    duracion_min: int | None = None
+
+
 class EpisodioResponseDTO(BaseModel):
     id: int
     temporada_id: int
@@ -88,6 +113,7 @@ class EpisodioResponseDTO(BaseModel):
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
+    video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, Loader2, Check } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { apiRequest, setToken, register } from "@/lib/api";
+import { apiRequest, register, setSelectedProfile, setToken } from "@/lib/api";
 import type { AuthResponse } from "@/lib/types";
 
 type Mode = "login" | "register";
@@ -31,7 +31,7 @@ const PLANS: { id: PlanType; label: string; description: string; features: strin
 ];
 
 interface LoginScreenProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (options?: { admin?: boolean }) => void;
 }
 
 export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
@@ -49,6 +49,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("estandar");
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -102,6 +106,30 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       setError(err instanceof Error ? err.message : "Error al registrarse");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+    setAdminLoading(true);
+
+    try {
+      const response = await apiRequest<AuthResponse>("/auth/admin-login", {
+        method: "POST",
+        body: JSON.stringify({
+          username: "titoflix-admin",
+          password: adminPassword,
+        }),
+      });
+
+      setToken(response.access_token);
+      setSelectedProfile({ id: -1, nombre: "Admin" });
+      onLoginSuccess({ admin: true });
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : "Error al iniciar como admin");
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -375,6 +403,61 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="fixed bottom-4 left-4 z-20 w-[min(320px,calc(100vw-2rem))]">
+        {!adminOpen ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAdminOpen(true);
+              setAdminError(null);
+            }}
+            className="rounded-lg border border-border bg-card/90 px-4 py-2 text-sm font-semibold text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
+          >
+            Acceso admin
+          </button>
+        ) : (
+          <form
+            onSubmit={handleAdminLogin}
+            className="rounded-lg border border-border bg-card/95 p-4 shadow-2xl backdrop-blur"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-foreground">Inicio admin</h2>
+              <button
+                type="button"
+                onClick={() => setAdminOpen(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <label htmlFor="admin-password" className="mb-1 block text-xs text-muted-foreground">
+              Contrasena
+            </label>
+            <input
+              id="admin-password"
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="mb-3 w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Contrasena admin"
+              disabled={adminLoading}
+              required
+            />
+
+            {adminError && <p className="mb-3 text-xs text-primary">{adminError}</p>}
+
+            <button
+              type="submit"
+              disabled={adminLoading}
+              className="w-full rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {adminLoading ? "Entrando..." : "Entrar como admin"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

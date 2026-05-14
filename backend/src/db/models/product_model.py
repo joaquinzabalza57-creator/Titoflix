@@ -86,6 +86,11 @@ class Contenido(Base):
         secondary=mi_lista,
         back_populates="mi_lista",
     )
+    video_variants = relationship(
+        "VideoVariant",
+        back_populates="contenido",
+        cascade="all, delete-orphan",
+    )
 
 
 class Temporada(Base):
@@ -123,9 +128,40 @@ class Episodio(Base):
 
     temporada = relationship("Temporada", back_populates="episodios")
     vistas = relationship("Vista", back_populates="episodio", cascade="all, delete-orphan")
+    video_variants = relationship(
+        "VideoVariant",
+        back_populates="episodio",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("temporada_id", "numero", name="uq_episodio_numero_por_temporada"),
+    )
+
+
+class VideoVariant(Base):
+    __tablename__ = "video_variants"
+
+    id = Column(Integer, primary_key=True)
+    contenido_id = Column(Integer, ForeignKey("contenidos.id"), nullable=True)
+    episodio_id = Column(Integer, ForeignKey("episodios.id"), nullable=True)
+    quality = Column(String, nullable=False)
+    video_storage_key = Column(String, nullable=False)
+    video_mime = Column(String, nullable=True)
+    video_size = Column(BigInteger, nullable=True)
+
+    contenido = relationship("Contenido", back_populates="video_variants")
+    episodio = relationship("Episodio", back_populates="video_variants")
+
+    __table_args__ = (
+        UniqueConstraint("contenido_id", "quality", name="uq_video_variant_contenido_quality"),
+        UniqueConstraint("episodio_id", "quality", name="uq_video_variant_episodio_quality"),
+        CheckConstraint(
+            "(contenido_id IS NOT NULL AND episodio_id IS NULL) OR "
+            "(contenido_id IS NULL AND episodio_id IS NOT NULL)",
+            name="ck_video_variant_un_solo_recurso",
+        ),
+        CheckConstraint("quality IN ('HD', '1440p', '4K')", name="ck_video_variant_quality"),
     )
 
 

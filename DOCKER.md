@@ -54,6 +54,8 @@ Ese comando no borra los archivos guardados en MinIO.
 - MinIO API S3: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
 
+El frontend usa `/api/v1` como ruta relativa y Next.js la proxyea al servicio `backend` dentro de Docker. Por eso, desde la UI las llamadas pasan por `http://localhost:3000/api/v1/...`, aunque Swagger siga disponible en `http://localhost:8000/docs`.
+
 Credenciales de MinIO:
 
 - Usuario: `titoflix`
@@ -73,6 +75,8 @@ S3_SECRET_KEY=titoflix-secret
 S3_BUCKET_NAME=titoflix-media
 S3_REGION=us-east-1
 S3_MEDIA_PREFIX=media
+INTERNAL_BACKEND_URL=http://backend:8000
+NEXT_PUBLIC_API_URL=/api/v1
 ```
 
 El backend crea las tablas al arrancar. PostgreSQL guarda datos en el volumen `postgres_data` y MinIO guarda archivos en `minio_data`.

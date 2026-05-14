@@ -18,16 +18,31 @@ export interface Genero {
   nombre: string;
 }
 
+export interface VideoVariant {
+  id: number;
+  quality: "HD" | "1440p" | "4K";
+  video_storage_key: string;
+  video_mime?: string;
+  video_size?: number;
+}
+
 export interface Contenido {
   id: number;
   titulo: string;
   descripcion?: string;
   tipo: "pelicula" | "serie";
   anio?: number;
+  duracion_min?: number;
   clasificacion?: string;
+  clasificacion_edad?: string;
   portada_url?: string;
   generos?: Genero[];
   promedio_calificacion?: number;
+  promedio_calificaciones?: number;
+  video_storage_key?: string;
+  video_mime?: string;
+  video_size?: number;
+  video_variants?: VideoVariant[];
 }
 
 export interface Temporada {
@@ -35,6 +50,7 @@ export interface Temporada {
   numero: number;
   nombre?: string;
   contenido_id: number;
+  anio?: number;
 }
 
 export interface Episodio {
@@ -44,6 +60,11 @@ export interface Episodio {
   descripcion?: string;
   temporada_id: number;
   duracion?: number;
+  duracion_min?: number;
+  video_storage_key?: string;
+  video_mime?: string;
+  video_size?: number;
+  video_variants?: VideoVariant[];
 }
 
 export interface PlaybackResponse {

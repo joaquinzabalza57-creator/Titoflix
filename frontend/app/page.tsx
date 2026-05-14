@@ -8,10 +8,11 @@ import { Hero } from "@/components/Hero";
 import { ContentRow } from "@/components/ContentRow";
 import { ContentDetail } from "@/components/ContentDetail";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { isAuthenticated, getSelectedProfile, apiRequest } from "@/lib/api";
+import { AdminDashboard } from "@/components/AdminDashboard";
+import { apiRequest, getSelectedProfile, isAuthenticated, logout } from "@/lib/api";
 import type { Contenido, MiListaItem, ContinuarViendoItem } from "@/lib/types";
 
-type AppView = "login" | "profile-select" | "home" | "player";
+type AppView = "login" | "profile-select" | "home" | "player" | "admin";
 type Section = "inicio" | "peliculas" | "series" | "mi-lista";
 
 // Mock data as fallback
@@ -53,6 +54,11 @@ export default function Home() {
   useEffect(() => {
     if (isAuthenticated()) {
       const profile = getSelectedProfile();
+      if (profile?.nombre === "Admin") {
+        logout();
+        setView("login");
+        return;
+      }
       if (profile) {
         setView("home");
       } else {
@@ -111,8 +117,8 @@ export default function Home() {
   const series = allContent.filter((c) => c.tipo === "serie");
 
   // Handlers
-  const handleLoginSuccess = () => {
-    setView("profile-select");
+  const handleLoginSuccess = (options?: { admin?: boolean }) => {
+    setView(options?.admin ? "admin" : "profile-select");
   };
 
   const handleProfileSelect = () => {
@@ -166,6 +172,10 @@ export default function Home() {
         onBack={handleBackFromPlayer}
       />
     );
+  }
+
+  if (view === "admin") {
+    return <AdminDashboard onLogout={handleLogout} />;
   }
 
   // Home view

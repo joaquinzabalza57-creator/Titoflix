@@ -54,11 +54,22 @@ class CreateTemporadaSchema(BaseModel):
     anio: int = Field(ge=1900)
 
 
+class UpdateTemporadaSchema(BaseModel):
+    numero: int | None = Field(default=None, ge=1)
+    anio: int | None = Field(default=None, ge=1900)
+
+
 class CreateEpisodioSchema(BaseModel):
     temporada_id: int
     numero: int = Field(ge=1)
     titulo: str = Field(min_length=1)
     duracion_min: int = Field(gt=0)
+
+
+class UpdateEpisodioSchema(BaseModel):
+    numero: int | None = Field(default=None, ge=1)
+    titulo: str | None = Field(default=None, min_length=1)
+    duracion_min: int | None = Field(default=None, gt=0)
 
 
 class UpsertVistaSchema(BaseModel):

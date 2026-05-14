@@ -1,10 +1,15 @@
 // API configuration and utility functions for TITOFLIX
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "http://localhost:8000/api/v1";
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
 export function getApiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
+}
+
+export function getDirectApiUrl(path: string): string {
+  return `${DIRECT_API_BASE_URL}${path}`;
 }
 
 export function getBackendUrl(path: string): string {
@@ -28,21 +33,40 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = getApiUrl(path);
+  const isFormData = options.body instanceof FormData;
+  const url = isFormData ? getDirectApiUrl(path) : getApiUrl(path);
+  const hasBody = options.body !== undefined && options.body !== null;
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
     ...getAuthHeaders(),
     ...options.headers,
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  if (hasBody && !isFormData) {
+    (headers as Record<string, string>)["Content-Type"] = "application/json";
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el backend. Verifica que Docker este corriendo y que el backend este en http://localhost:8000.");
+  }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Error desconocido" }));
-    throw new Error(error.detail || `Error ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const error = await response.json().catch(() => null);
+      const detail = Array.isArray(error?.detail)
+        ? error.detail.map((item: { msg?: string }) => item.msg).filter(Boolean).join(". ")
+        : error?.detail;
+      throw new Error(error?.message || detail || `Error ${response.status}`);
+    }
+
+    const text = await response.text().catch(() => "");
+    throw new Error(text.trim() || `Error ${response.status}`);
   }
 
   return response.json();

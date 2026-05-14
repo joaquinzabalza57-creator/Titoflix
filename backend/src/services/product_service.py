@@ -14,6 +14,8 @@ from src.dtos import (
     GeneroResponseDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
+    UpdateEpisodioDTO,
+    UpdateTemporadaDTO,
     VistaResponseDTO,
 )
 from src.mappers import (
@@ -33,6 +35,7 @@ from src.repositories import (
     EpisodioRepository,
     GeneroRepository,
     TemporadaRepository,
+    VideoVariantRepository,
     VistaRepository,
 )
 from src.repositories import PerfilRepository
@@ -74,6 +77,7 @@ class ContenidoService:
         self.contenido_repo = ContenidoRepository(db)
         self.genero_repo = GeneroRepository(db)
         self.perfil_repo = PerfilRepository(db)
+        self.video_variant_repo = VideoVariantRepository(db)
 
     def create(self, dto: CreateContenidoDTO) -> ContenidoResponseDTO:
         return self.create_with_video(dto, video_file=None)
@@ -82,7 +86,9 @@ class ContenidoService:
         self,
         dto: CreateContenidoDTO,
         video_file: UploadFile | None,
+        quality: str = "HD",
     ) -> ContenidoResponseDTO:
+        quality = self._validate_quality(quality)
         self._validate_content_payload(
             tipo=dto.tipo,
             duracion_min=dto.duracion_min,
@@ -119,6 +125,14 @@ class ContenidoService:
             video_mime=video.mime_type if video else None,
             video_size=video.size if video else None,
         )
+        if video:
+            self.video_variant_repo.upsert_for_contenido(
+                contenido_id=contenido.id,
+                quality=quality,
+                video_storage_key=video.object_key,
+                video_mime=video.mime_type,
+                video_size=video.size,
+            )
         return to_contenido_response(contenido)
 
     def get_by_id(self, contenido_id: int) -> ContenidoResponseDTO:
@@ -147,11 +161,24 @@ class ContenidoService:
         return to_contenido_response_list(contenidos)
 
     def update(self, contenido_id: int, dto: UpdateContenidoDTO) -> ContenidoResponseDTO:
+        return self.update_with_video(contenido_id, dto, video_file=None)
+
+    def update_with_video(
+        self,
+        contenido_id: int,
+        dto: UpdateContenidoDTO,
+        video_file: UploadFile | None,
+        quality: str = "HD",
+    ) -> ContenidoResponseDTO:
+        quality = self._validate_quality(quality)
         contenido_actual = self.contenido_repo.find_by_id(contenido_id)
         if not contenido_actual:
             raise NotFoundError("Contenido no encontrado")
 
         fields = dto.model_dump(exclude_unset=True)
+        if "tipo" in fields and fields["tipo"] != contenido_actual.tipo:
+            raise ConflictError("No se puede cambiar el tipo de contenido")
+
         self._validate_content_payload(
             tipo=fields.get("tipo", contenido_actual.tipo),
             duracion_min=fields.get("duracion_min", contenido_actual.duracion_min),
@@ -159,7 +186,34 @@ class ContenidoService:
             require_generos=False,
         )
 
+        if video_file is not None:
+            if contenido_actual.tipo != "pelicula":
+                raise ConflictError("Las series no llevan video directo; cambia el video desde sus episodios")
+            self._validate_video_file(video_file)
+            storage = StorageService()
+            parent_folder_id = contenido_actual.storage_folder_id or storage.create_folder(
+                fields.get("titulo", contenido_actual.titulo)
+            )
+            video = storage.upload_video(
+                file=video_file.file,
+                filename=video_file.filename or f"{fields.get('titulo', contenido_actual.titulo)}.mp4",
+                mime_type=video_file.content_type or "video/mp4",
+                parent_folder_id=parent_folder_id,
+            )
+            fields["storage_folder_id"] = parent_folder_id
+            fields["video_storage_key"] = video.object_key
+            fields["video_mime"] = video.mime_type
+            fields["video_size"] = video.size
+
         contenido = self.contenido_repo.update(contenido_id, **fields)
+        if video_file is not None:
+            self.video_variant_repo.upsert_for_contenido(
+                contenido_id=contenido.id,
+                quality=quality,
+                video_storage_key=contenido.video_storage_key,
+                video_mime=contenido.video_mime,
+                video_size=contenido.video_size,
+            )
         return to_contenido_response(contenido)
 
     def delete(self, contenido_id: int) -> None:
@@ -170,12 +224,21 @@ class ContenidoService:
         contenidos = self.contenido_repo.top(limit=10, genero=genero)
         return to_contenido_response_list(contenidos)
 
-    def get_video_source(self, contenido_id: int) -> VideoSourceDTO:
+    def get_video_source(self, contenido_id: int, quality: str | None = None) -> VideoSourceDTO:
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:
             raise NotFoundError("Contenido no encontrado")
         if contenido.tipo != "pelicula":
             raise ConflictError("Las series se reproducen por episodio")
+        variant = self._select_video_variant(contenido.video_variants, quality)
+        if variant:
+            return VideoSourceDTO(
+                file_id=variant.video_storage_key,
+                mime_type=variant.video_mime or "video/mp4",
+                filename=contenido.titulo,
+            )
+        if quality and contenido.video_variants:
+            raise NotFoundError("No hay video cargado para esa calidad")
         if not contenido.video_storage_key:
             raise NotFoundError("Video no encontrado")
 
@@ -187,6 +250,8 @@ class ContenidoService:
 
     def _validate_content_payload(self, tipo, duracion_min, generos_ids, require_generos=True):
         if require_generos and not generos_ids:
+            raise ConflictError("Cada contenido debe tener al menos un genero")
+        if generos_ids is not None and len(generos_ids) == 0:
             raise ConflictError("Cada contenido debe tener al menos un genero")
         if generos_ids:
             generos = [self.genero_repo.find_by_id(gid) for gid in generos_ids]
@@ -201,6 +266,19 @@ class ContenidoService:
         content_type = video_file.content_type or ""
         if not content_type.startswith("video/"):
             raise ConflictError("El archivo debe ser un video")
+
+    def _validate_quality(self, quality: str) -> str:
+        if quality not in {"HD", "1440p", "4K"}:
+            raise ConflictError("La calidad debe ser HD, 1440p o 4K")
+        return quality
+
+    def _select_video_variant(self, variants, quality: str | None):
+        if not variants:
+            return None
+        if quality:
+            return next((variant for variant in variants if variant.quality == quality), None)
+        priority = {"4K": 3, "1440p": 2, "HD": 1}
+        return sorted(variants, key=lambda variant: priority.get(variant.quality, 0), reverse=True)[0]
 
 
 class TemporadaService:
@@ -238,6 +316,13 @@ class TemporadaService:
             for t in self.temporada_repo.list_by_contenido(contenido_id)
         ]
 
+    def update(self, temporada_id: int, dto: UpdateTemporadaDTO) -> TemporadaResponseDTO:
+        fields = dto.model_dump(exclude_unset=True)
+        temporada = self.temporada_repo.update(temporada_id, **fields)
+        if not temporada:
+            raise NotFoundError("Temporada no encontrada")
+        return to_temporada_response(temporada)
+
     def delete(self, temporada_id: int) -> None:
         if not self.temporada_repo.delete(temporada_id):
             raise NotFoundError("Temporada no encontrada")
@@ -247,6 +332,7 @@ class EpisodioService:
     def __init__(self, db: Session):
         self.temporada_repo = TemporadaRepository(db)
         self.episodio_repo = EpisodioRepository(db)
+        self.video_variant_repo = VideoVariantRepository(db)
 
     def create(self, dto: CreateEpisodioDTO) -> EpisodioResponseDTO:
         return self.create_with_video(dto, video_file=None)
@@ -255,7 +341,9 @@ class EpisodioService:
         self,
         dto: CreateEpisodioDTO,
         video_file: UploadFile | None,
+        quality: str = "HD",
     ) -> EpisodioResponseDTO:
+        quality = self._validate_quality(quality)
         temporada = self.temporada_repo.find_by_id(dto.temporada_id)
         if not temporada:
             raise NotFoundError("Temporada no encontrada")
@@ -284,6 +372,13 @@ class EpisodioService:
             video_mime=video.mime_type,
             video_size=video.size,
         )
+        self.video_variant_repo.upsert_for_episodio(
+            episodio_id=episodio.id,
+            quality=quality,
+            video_storage_key=video.object_key,
+            video_mime=video.mime_type,
+            video_size=video.size,
+        )
         return to_episodio_response(episodio)
 
     def list_by_temporada(self, temporada_id: int) -> list[EpisodioResponseDTO]:
@@ -294,14 +389,66 @@ class EpisodioService:
             for e in self.episodio_repo.list_by_temporada(temporada_id)
         ]
 
+    def update(self, episodio_id: int, dto: UpdateEpisodioDTO) -> EpisodioResponseDTO:
+        fields = dto.model_dump(exclude_unset=True)
+        episodio = self.episodio_repo.update(episodio_id, **fields)
+        if not episodio:
+            raise NotFoundError("Episodio no encontrado")
+        return to_episodio_response(episodio)
+
+    def update_with_video(
+        self,
+        episodio_id: int,
+        dto: UpdateEpisodioDTO,
+        video_file: UploadFile | None,
+        quality: str = "HD",
+    ) -> EpisodioResponseDTO:
+        quality = self._validate_quality(quality)
+        fields = dto.model_dump(exclude_unset=True)
+        episodio = self.episodio_repo.find_by_id(episodio_id)
+        if not episodio:
+            raise NotFoundError("Episodio no encontrado")
+
+        if video_file is not None:
+            self._validate_video_file(video_file)
+            video = StorageService().upload_video(
+                file=video_file.file,
+                filename=video_file.filename or f"episodio-{fields.get('numero', episodio.numero)}.mp4",
+                mime_type=video_file.content_type or "video/mp4",
+                parent_folder_id=episodio.temporada.storage_folder_id,
+            )
+            fields["video_storage_key"] = video.object_key
+            fields["video_mime"] = video.mime_type
+            fields["video_size"] = video.size
+
+        episodio = self.episodio_repo.update(episodio_id, **fields)
+        if video_file is not None:
+            self.video_variant_repo.upsert_for_episodio(
+                episodio_id=episodio.id,
+                quality=quality,
+                video_storage_key=episodio.video_storage_key,
+                video_mime=episodio.video_mime,
+                video_size=episodio.video_size,
+            )
+        return to_episodio_response(episodio)
+
     def delete(self, episodio_id: int) -> None:
         if not self.episodio_repo.delete(episodio_id):
             raise NotFoundError("Episodio no encontrado")
 
-    def get_video_source(self, episodio_id: int) -> VideoSourceDTO:
+    def get_video_source(self, episodio_id: int, quality: str | None = None) -> VideoSourceDTO:
         episodio = self.episodio_repo.find_by_id(episodio_id)
         if not episodio:
             raise NotFoundError("Episodio no encontrado")
+        variant = self._select_video_variant(episodio.video_variants, quality)
+        if variant:
+            return VideoSourceDTO(
+                file_id=variant.video_storage_key,
+                mime_type=variant.video_mime or "video/mp4",
+                filename=episodio.titulo,
+            )
+        if quality and episodio.video_variants:
+            raise NotFoundError("No hay video cargado para esa calidad")
         if not episodio.video_storage_key:
             raise NotFoundError("Video no encontrado")
 
@@ -310,6 +457,24 @@ class EpisodioService:
             mime_type=episodio.video_mime or "video/mp4",
             filename=episodio.titulo,
         )
+
+    def _validate_video_file(self, video_file: UploadFile) -> None:
+        content_type = video_file.content_type or ""
+        if not content_type.startswith("video/"):
+            raise ConflictError("El archivo debe ser un video")
+
+    def _validate_quality(self, quality: str) -> str:
+        if quality not in {"HD", "1440p", "4K"}:
+            raise ConflictError("La calidad debe ser HD, 1440p o 4K")
+        return quality
+
+    def _select_video_variant(self, variants, quality: str | None):
+        if not variants:
+            return None
+        if quality:
+            return next((variant for variant in variants if variant.quality == quality), None)
+        priority = {"4K": 3, "1440p": 2, "HD": 1}
+        return sorted(variants, key=lambda variant: priority.get(variant.quality, 0), reverse=True)[0]
 
 
 class VistaService:
