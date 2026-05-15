@@ -4,13 +4,23 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_admin?: boolean;
+}
+
+export interface AuthAccount {
+  id: number;
+  email: string;
+  plan: "basico" | "estandar" | "premium";
+  is_admin: boolean;
 }
 
 export interface Profile {
   id: number;
   nombre: string;
   avatar?: string;
-  user_id: number;
+  cuenta_id: number;
+  es_infantil?: boolean;
+  has_pin?: boolean;
 }
 
 export interface Genero {
@@ -20,10 +30,15 @@ export interface Genero {
 
 export interface VideoVariant {
   id: number;
-  quality: "HD" | "1440p" | "4K";
+  quality: "FHD" | "QHD" | "4K";
   video_storage_key: string;
   video_mime?: string;
   video_size?: number;
+}
+
+export interface ProcessingWarning {
+  message: string;
+  source_quality: string;
 }
 
 export interface Contenido {
@@ -36,6 +51,7 @@ export interface Contenido {
   clasificacion?: string;
   clasificacion_edad?: string;
   portada_url?: string;
+  processing_warning?: ProcessingWarning;
   generos?: Genero[];
   promedio_calificacion?: number;
   promedio_calificaciones?: number;
@@ -67,6 +83,8 @@ export interface Episodio {
   video_mime?: string;
   video_size?: number;
   video_variants?: VideoVariant[];
+  thumbnail_url?: string;
+  processing_warning?: ProcessingWarning;
 }
 
 export interface PlaybackResponse {
@@ -76,6 +94,9 @@ export interface PlaybackResponse {
 export interface AuthResponse {
   access_token: string;
   token_type: string;
+  id?: number;
+  is_admin?: boolean;
+  email?: string;
   user?: User;
 }
 

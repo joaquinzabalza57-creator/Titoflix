@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Film, Loader2, LogOut, Play, Plus, RefreshCw, Tv, Upload } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { apiRequest, getBackendUrl, logout } from "@/lib/api";
-import type { Contenido, Episodio, Genero, PlaybackResponse, Temporada } from "@/lib/types";
+import { apiRequest, getAssetUrl, getBackendUrl, logout } from "@/lib/api";
+import type { Contenido, Episodio, Genero, PlaybackResponse, Temporada, VideoVariant } from "@/lib/types";
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -12,6 +12,16 @@ interface AdminDashboardProps {
 
 type Message = { type: "ok" | "error"; text: string } | null;
 type AdminTab = "crear" | "modificar" | "eliminar";
+type PlaybackResource = {
+  type: "contenido" | "episodio";
+  id: number;
+  title: string;
+  qualities: string[];
+};
+type TestPlayback = PlaybackResource & {
+  url: string;
+  selectedQuality: string;
+};
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [contenidos, setContenidos] = useState<Contenido[]>([]);
@@ -30,10 +40,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [updateContenidoId, setUpdateContenidoId] = useState("");
   const [contenidoTipo, setContenidoTipo] = useState<"pelicula" | "serie">("pelicula");
   const [contenidoVideoName, setContenidoVideoName] = useState("");
+  const [contenidoPortadaName, setContenidoPortadaName] = useState("");
   const [updateContenidoVideoName, setUpdateContenidoVideoName] = useState("");
+  const [updateContenidoPortadaName, setUpdateContenidoPortadaName] = useState("");
   const [episodioVideoName, setEpisodioVideoName] = useState("");
   const [updateEpisodioVideoName, setUpdateEpisodioVideoName] = useState("");
-  const [testPlayback, setTestPlayback] = useState<{ title: string; url: string } | null>(null);
+  const [testPlayback, setTestPlayback] = useState<TestPlayback | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("crear");
   const [loading, setLoading] = useState(false);
   const [creatingContenido, setCreatingContenido] = useState(false);
@@ -92,6 +104,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   useEffect(() => {
     setUpdateContenidoVideoName("");
+    setUpdateContenidoPortadaName("");
   }, [updateContenidoId]);
 
   useEffect(() => {
@@ -226,6 +239,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     if (video instanceof File && video.size === 0) {
       form.delete("video");
     }
+    const portada = form.get("portada");
+    if (portada instanceof File && portada.size === 0) {
+      form.delete("portada");
+    }
     if (form.get("tipo") === "pelicula" && !(video instanceof File && video.size > 0)) {
       setContenidoFormMessage({ type: "error", text: "Selecciona un archivo de video para crear la pelicula." });
       return;
@@ -234,12 +251,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setCreatingContenido(true);
     setContenidoFormMessage({ type: "ok", text: "Subiendo contenido. Esto puede tardar si el video es pesado." });
     try {
-      await apiRequest("/contenidos", { method: "POST", body: form });
+      const created = await apiRequest<Contenido>("/contenidos", { method: "POST", body: form });
       formElement.reset();
       setContenidoTipo("pelicula");
       setContenidoVideoName("");
-      setContenidoFormMessage(null);
-      showOk("Contenido creado");
+      setContenidoPortadaName("");
+      setContenidoFormMessage(created.processing_warning ? { type: "ok", text: created.processing_warning.message } : null);
+      showOk(created.processing_warning?.message || "Contenido creado");
       loadBaseData();
     } catch (error) {
       setContenidoFormMessage({ type: "error", text: error instanceof Error ? error.message : "No se pudo crear el contenido" });
@@ -311,11 +329,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setCreatingEpisodio(true);
     setEpisodioFormMessage({ type: "ok", text: "Subiendo episodio. Esto puede tardar si el video es pesado." });
     try {
-      await apiRequest("/episodios", { method: "POST", body: form });
+      const created = await apiRequest<Episodio>("/episodios", { method: "POST", body: form });
       formElement.reset();
       setEpisodioVideoName("");
-      setEpisodioFormMessage(null);
-      showOk("Episodio creado");
+      setEpisodioFormMessage(created.processing_warning ? { type: "ok", text: created.processing_warning.message } : null);
+      showOk(created.processing_warning?.message || "Episodio creado");
       if (temporadaId === selectedTemporadaId) {
         const data = await apiRequest<Episodio[]>(`/temporadas/${temporadaId}/episodios`);
         setEpisodios(data);
@@ -331,27 +349,75 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
   };
 
-  const openPlayback = async (contenido: Contenido) => {
+  const playbackPath = (resource: PlaybackResource, quality: string) => {
+    const basePath =
+      resource.type === "contenido"
+        ? `/contenidos/${resource.id}/playback`
+        : `/episodios/${resource.id}/playback`;
+    return quality ? `${basePath}?quality=${encodeURIComponent(quality)}` : basePath;
+  };
+
+  const qualityOptions = (variants: VideoVariant[] | undefined) =>
+    [...(variants || [])]
+      .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality))
+      .map((variant) => variant.quality);
+
+  const openPlayback = async (contenido: Contenido, quality?: string) => {
+    const qualities = qualityOptions(contenido.video_variants);
+    const selectedQuality = quality || qualities[0] || "";
+    const resource: PlaybackResource = {
+      type: "contenido",
+      id: contenido.id,
+      title: contenido.titulo,
+      qualities,
+    };
+
     try {
-      const data = await apiRequest<PlaybackResponse>(`/contenidos/${contenido.id}/playback`);
+      const data = await apiRequest<PlaybackResponse>(playbackPath(resource, selectedQuality));
       setTestPlayback({
-        title: contenido.titulo,
+        ...resource,
         url: getBackendUrl(data.stream_url),
+        selectedQuality,
       });
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "No se pudo probar el video" });
     }
   };
 
-  const openEpisodePlayback = async (episodio: Episodio) => {
+  const openEpisodePlayback = async (episodio: Episodio, quality?: string) => {
+    const qualities = qualityOptions(episodio.video_variants);
+    const selectedQuality = quality || qualities[0] || "";
+    const resource: PlaybackResource = {
+      type: "episodio",
+      id: episodio.id,
+      title: episodio.titulo,
+      qualities,
+    };
+
     try {
-      const data = await apiRequest<PlaybackResponse>(`/episodios/${episodio.id}/playback`);
+      const data = await apiRequest<PlaybackResponse>(playbackPath(resource, selectedQuality));
       setTestPlayback({
-        title: episodio.titulo,
+        ...resource,
         url: getBackendUrl(data.stream_url),
+        selectedQuality,
       });
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "No se pudo probar el episodio" });
+    }
+  };
+
+  const updateTestPlaybackQuality = async (quality: string) => {
+    if (!testPlayback) return;
+
+    try {
+      const data = await apiRequest<PlaybackResponse>(playbackPath(testPlayback, quality));
+      setTestPlayback({
+        ...testPlayback,
+        selectedQuality: quality,
+        url: getBackendUrl(data.stream_url),
+      });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "No se pudo cambiar la calidad" });
     }
   };
 
@@ -380,14 +446,19 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     if (video instanceof File && video.size === 0) {
       form.delete("video");
     }
+    const portada = form.get("portada");
+    if (portada instanceof File && portada.size === 0) {
+      form.delete("portada");
+    }
 
     try {
-      await apiRequest(`/contenidos/${selectedUpdateContenido.id}`, {
+      const updated = await apiRequest<Contenido>(`/contenidos/${selectedUpdateContenido.id}`, {
         method: "PUT",
         body: form,
       });
       setUpdateContenidoVideoName("");
-      showOk("Contenido actualizado");
+      setUpdateContenidoPortadaName("");
+      showOk(updated.processing_warning?.message || "Contenido actualizado");
       loadBaseData();
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "No se pudo modificar el contenido" });
@@ -423,12 +494,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       if (video instanceof File && video.size === 0) {
         form.delete("video");
       }
-      await apiRequest(`/episodios/${Number(form.get("episodio_id"))}`, {
+      const updated = await apiRequest<Episodio>(`/episodios/${Number(form.get("episodio_id"))}`, {
         method: "PUT",
         body: form,
       });
       setUpdateEpisodioVideoName("");
-      showOk("Episodio actualizado");
+      showOk(updated.processing_warning?.message || "Episodio actualizado");
       if (selectedTemporadaId) {
         const data = await apiRequest<Episodio[]>(`/temporadas/${selectedTemporadaId}/episodios`);
         setEpisodios(data);
@@ -564,6 +635,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <option value="+18">+18</option>
                 </select>
               </div>
+              <FilePicker
+                id="contenido-portada"
+                name="portada"
+                label="Portada"
+                fileName={contenidoPortadaName}
+                onChange={setContenidoPortadaName}
+                accept="image/*"
+                hint="JPG, PNG, WebP u otro formato de imagen"
+              />
               {contenidoTipo === "pelicula" && (
                 <>
                   <FilePicker
@@ -750,6 +830,22 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       </p>
                     </>
                   )}
+                  <FilePicker
+                    id={`update-contenido-portada-${selectedUpdateContenido.id}`}
+                    name="portada"
+                    label="Reemplazar portada"
+                    fileName={updateContenidoPortadaName}
+                    onChange={setUpdateContenidoPortadaName}
+                    accept="image/*"
+                    hint="Si no elegis una imagen nueva, se conserva la portada actual"
+                  />
+                  {getAssetUrl(selectedUpdateContenido.portada_url) && (
+                    <img
+                      src={getAssetUrl(selectedUpdateContenido.portada_url) || ""}
+                      alt=""
+                      className="h-32 w-24 rounded-md object-cover"
+                    />
+                  )}
                   <textarea
                     name="descripcion"
                     placeholder="Descripcion"
@@ -917,6 +1013,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {contenidos.map((contenido) => (
                   <div key={contenido.id} className="rounded-lg border border-border bg-secondary/50 p-4">
+                    {getAssetUrl(contenido.portada_url) && (
+                      <img
+                        src={getAssetUrl(contenido.portada_url) || ""}
+                        alt=""
+                        className="mb-3 aspect-[2/3] w-20 rounded-md object-cover"
+                      />
+                    )}
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <h3 className="font-semibold">{contenido.titulo}</h3>
@@ -999,6 +1102,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   key={episodio.id}
                   className="flex flex-col gap-3 rounded-md border border-border bg-secondary/50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
+                  {getAssetUrl(episodio.thumbnail_url) && (
+                    <img
+                      src={getAssetUrl(episodio.thumbnail_url) || ""}
+                      alt=""
+                      className="h-16 w-28 shrink-0 rounded-md object-cover"
+                    />
+                  )}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">
                       E{episodio.numero} - {episodio.titulo}
@@ -1023,8 +1133,28 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
         {testPlayback && (
           <AdminPanel title={`Test playback - ${testPlayback.title}`}>
+            {testPlayback.qualities.length > 0 && (
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label htmlFor="test-playback-quality" className="text-sm font-medium text-muted-foreground">
+                  Calidad
+                </label>
+                <select
+                  id="test-playback-quality"
+                  className="admin-input sm:max-w-48"
+                  value={testPlayback.selectedQuality}
+                  onChange={(event) => updateTestPlaybackQuality(event.target.value)}
+                >
+                  {testPlayback.qualities.map((quality) => (
+                    <option key={quality} value={quality}>
+                      {quality}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="overflow-hidden rounded-lg border border-border bg-black">
               <video
+                key={testPlayback.url}
                 src={testPlayback.url}
                 controls
                 autoPlay
@@ -1176,6 +1306,10 @@ function dedupeById(contents: Contenido[]): Contenido[] {
   return Array.from(new Map(contents.map((content) => [content.id, content])).values());
 }
 
+function qualityRank(quality: string): number {
+  return { FHD: 1, QHD: 2, "4K": 3 }[quality] || 0;
+}
+
 function FilePicker({
   id,
   name,
@@ -1183,6 +1317,8 @@ function FilePicker({
   fileName,
   onChange,
   required = false,
+  accept = "video/*",
+  hint = "MP4, WebM u otro formato de video",
 }: {
   id: string;
   name: string;
@@ -1190,6 +1326,8 @@ function FilePicker({
   fileName: string;
   onChange: (fileName: string) => void;
   required?: boolean;
+  accept?: string;
+  hint?: string;
 }) {
   return (
     <div>
@@ -1206,7 +1344,7 @@ function FilePicker({
             <span className="block truncate text-sm font-medium text-foreground">
               {fileName || "No hay archivo seleccionado"}
             </span>
-            <span className="block text-xs text-muted-foreground">MP4, WebM u otro formato de video</span>
+            <span className="block text-xs text-muted-foreground">{hint}</span>
           </span>
         </span>
         <span className="shrink-0 rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
@@ -1217,7 +1355,7 @@ function FilePicker({
         id={id}
         name={name}
         type="file"
-        accept="video/*"
+        accept={accept}
         aria-required={required}
         className="sr-only"
         onChange={(event) => onChange(event.target.files?.[0]?.name || "")}

@@ -53,5 +53,6 @@ class PerfilSchema(BaseModel):
     nombre: str                                  # Nombre del perfil
     es_infantil: bool                            # Indica si es un perfil infantil
     avatar: str | None = None                    # Avatar opcional (URL o referencia)
+    has_pin: bool = False
 
     model_config = {"from_attributes": True}     # Permite crear el schema desde objetos ORM (SQLAlchemy)

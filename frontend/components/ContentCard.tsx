@@ -1,6 +1,7 @@
 "use client";
 
 import { Play, Film, Tv } from "lucide-react";
+import { getAssetUrl } from "@/lib/api";
 import type { Contenido } from "@/lib/types";
 
 interface ContentCardProps {
@@ -9,6 +10,7 @@ interface ContentCardProps {
 }
 
 export function ContentCard({ content, onClick }: ContentCardProps) {
+  const portadaUrl = getAssetUrl(content.portada_url);
   return (
     <button
       onClick={onClick}
@@ -16,9 +18,9 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
     >
       {/* Thumbnail */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover:border-muted-foreground transition-all duration-200">
-        {content.portada_url ? (
+        {portadaUrl ? (
           <img
-            src={content.portada_url}
+            src={portadaUrl}
             alt={content.titulo}
             className="w-full h-full object-cover"
           />

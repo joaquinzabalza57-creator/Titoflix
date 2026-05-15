@@ -61,6 +61,7 @@ class Contenido(Base):
     video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
     video_size = Column(BigInteger, nullable=True)
+    portada_url = Column(String, nullable=True)
 
     generos = relationship(
         "Genero",
@@ -127,6 +128,7 @@ class Episodio(Base):
     video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
     video_size = Column(BigInteger, nullable=True)
+    thumbnail_url = Column(String, nullable=True)
 
     temporada = relationship("Temporada", back_populates="episodios")
     vistas = relationship("Vista", back_populates="episodio", cascade="all, delete-orphan")
@@ -163,7 +165,7 @@ class VideoVariant(Base):
             "(contenido_id IS NULL AND episodio_id IS NOT NULL)",
             name="ck_video_variant_un_solo_recurso",
         ),
-        CheckConstraint("quality IN ('HD', '1440p', '4K')", name="ck_video_variant_quality"),
+        CheckConstraint("quality IN ('FHD', 'QHD', '4K')", name="ck_video_variant_quality"),
     )
 
 

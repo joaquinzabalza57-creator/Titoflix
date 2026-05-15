@@ -20,6 +20,11 @@ class VideoVariantResponseDTO(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VideoProcessingWarningDTO(BaseModel):
+    message: str
+    source_quality: str
+
+
 class CreateContenidoDTO(BaseModel):
     titulo: str
     tipo: str
@@ -32,6 +37,7 @@ class CreateContenidoDTO(BaseModel):
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
+    portada_url: str | None = None
 
 
 class UpdateContenidoDTO(BaseModel):
@@ -45,6 +51,7 @@ class UpdateContenidoDTO(BaseModel):
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
+    portada_url: str | None = None
 
 
 class ContenidoResponseDTO(BaseModel):
@@ -62,6 +69,8 @@ class ContenidoResponseDTO(BaseModel):
     video_mime: str | None = None
     video_size: int | None = None
     video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
+    portada_url: str | None = None
+    processing_warning: VideoProcessingWarningDTO | None = None
 
     model_config = {"from_attributes": True}
 
@@ -97,12 +106,14 @@ class CreateEpisodioDTO(BaseModel):
     video_storage_key: str | None = None
     video_mime: str | None = None
     video_size: int | None = None
+    thumbnail_url: str | None = None
 
 
 class UpdateEpisodioDTO(BaseModel):
     numero: int | None = None
     titulo: str | None = None
     duracion_min: float | None = None
+    thumbnail_url: str | None = None
 
 
 class EpisodioResponseDTO(BaseModel):
@@ -116,6 +127,8 @@ class EpisodioResponseDTO(BaseModel):
     video_mime: str | None = None
     video_size: int | None = None
     video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
+    thumbnail_url: str | None = None
+    processing_warning: VideoProcessingWarningDTO | None = None
 
     model_config = {"from_attributes": True}
 

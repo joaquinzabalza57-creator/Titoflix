@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { LoginScreen } from "@/components/LoginScreen";
 import { ProfileSelector } from "@/components/ProfileSelector";
+import { ProfileCreateScreen } from "@/components/ProfileCreateScreen";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { ContentRow } from "@/components/ContentRow";
 import { ContentDetail } from "@/components/ContentDetail";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { apiRequest, getSelectedProfile, isAuthenticated, logout } from "@/lib/api";
-import type { Contenido, MiListaItem, ContinuarViendoItem } from "@/lib/types";
+import { apiRequest, getSelectedProfile, getStoredAccount, isAuthenticated, logout, setStoredAccount } from "@/lib/api";
+import type { AuthAccount, Contenido, MiListaItem, ContinuarViendoItem, Profile } from "@/lib/types";
 
-type AppView = "login" | "profile-select" | "home" | "player" | "admin";
+type AppView = "login" | "profile-select" | "profile-create" | "home" | "player" | "admin";
 type Section = "inicio" | "peliculas" | "series" | "mi-lista";
 
 // Mock data as fallback
@@ -42,6 +43,7 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("inicio");
   const [selectedContent, setSelectedContent] = useState<Contenido | null>(null);
   const [playerData, setPlayerData] = useState<{ url: string; title: string } | null>(null);
+  const [account, setAccount] = useState<AuthAccount | null>(null);
 
   // Content state
   const [allContent, setAllContent] = useState<Contenido[]>([]);
@@ -52,22 +54,52 @@ export default function Home() {
 
   // Check auth status on mount
   useEffect(() => {
-    if (isAuthenticated()) {
-      const profile = getSelectedProfile();
-      if (profile?.nombre === "Admin") {
+    if (!isAuthenticated()) {
+      setView("login");
+      return;
+    }
+
+    const account = getStoredAccount();
+    if (account?.is_admin) {
+      setView("admin");
+      return;
+    }
+
+    apiRequest<AuthAccount>("/auth/me")
+      .then((currentAccount) => {
+        setAccount(currentAccount);
+        setStoredAccount({
+          id: currentAccount.id,
+          email: currentAccount.email,
+          is_admin: currentAccount.is_admin,
+        });
+        if (currentAccount.is_admin) {
+          setView("admin");
+          return;
+        }
+        routeAfterAccountLoad(currentAccount);
+      })
+      .catch(() => {
         logout();
         setView("login");
+      });
+  }, []);
+
+  const routeAfterAccountLoad = async (currentAccount: AuthAccount) => {
+    try {
+      const profiles = await apiRequest<Profile[]>(`/cuentas/${currentAccount.id}/perfiles`);
+      if (!profiles || profiles.length === 0) {
+        setView("profile-create");
         return;
       }
-      if (profile) {
-        setView("home");
-      } else {
-        setView("profile-select");
-      }
-    } else {
-      setView("login");
+
+      const selectedProfile = getSelectedProfile();
+      const selectedStillExists = selectedProfile && profiles.some((profile) => profile.id === selectedProfile.id);
+      setView(selectedStillExists ? "home" : "profile-select");
+    } catch {
+      setView("profile-select");
     }
-  }, []);
+  };
 
   // Fetch content
   const fetchContent = useCallback(async () => {
@@ -118,11 +150,40 @@ export default function Home() {
 
   // Handlers
   const handleLoginSuccess = (options?: { admin?: boolean }) => {
-    setView(options?.admin ? "admin" : "profile-select");
+    if (options?.admin) {
+      setView("admin");
+      return;
+    }
+
+    apiRequest<AuthAccount>("/auth/me")
+      .then((currentAccount) => {
+        setAccount(currentAccount);
+        setStoredAccount({
+          id: currentAccount.id,
+          email: currentAccount.email,
+          is_admin: currentAccount.is_admin,
+        });
+        return routeAfterAccountLoad(currentAccount);
+      })
+      .catch(() => setView("profile-select"));
   };
 
   const handleProfileSelect = () => {
     setView("home");
+  };
+
+  const handleNoProfiles = () => {
+    setView("profile-create");
+  };
+
+  const handleCreateProfile = () => {
+    setView("profile-create");
+  };
+
+  const handleProfileChanged = () => {
+    setSelectedContent(null);
+    setPlayerData(null);
+    fetchContent();
   };
 
   const handleLogout = () => {
@@ -130,6 +191,7 @@ export default function Home() {
     setActiveSection("inicio");
     setSelectedContent(null);
     setPlayerData(null);
+    setAccount(null);
   };
 
   const handleNavigate = (section: string) => {
@@ -161,7 +223,30 @@ export default function Home() {
   }
 
   if (view === "profile-select") {
-    return <ProfileSelector onProfileSelect={handleProfileSelect} />;
+    if (!account) {
+      return null;
+    }
+    return (
+      <ProfileSelector
+        accountId={account.id}
+        accountPlan={account.plan}
+        onProfileSelect={handleProfileSelect}
+        onNoProfiles={handleNoProfiles}
+        onCreateProfile={handleCreateProfile}
+      />
+    );
+  }
+
+  if (view === "profile-create") {
+    if (!account) {
+      return null;
+    }
+    return (
+      <ProfileCreateScreen
+        accountId={account.id}
+        onProfileCreated={handleProfileSelect}
+      />
+    );
   }
 
   if (view === "player" && playerData) {
@@ -178,13 +263,19 @@ export default function Home() {
     return <AdminDashboard onLogout={handleLogout} />;
   }
 
+  if (!account) {
+    return null;
+  }
+
   // Home view
   return (
     <div className="min-h-screen bg-background">
       <Header
         activeSection={activeSection}
+        account={account}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
+        onProfileChanged={handleProfileChanged}
       />
 
       <main>

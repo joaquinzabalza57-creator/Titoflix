@@ -24,7 +24,9 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     ensure_account_admin_column()
     ensure_storage_media_columns()
+    ensure_asset_media_columns()
     ensure_duration_columns_are_float()
+    ensure_video_variant_quality_values()
     ensure_default_admin_account()
     print("Tablas creadas exitosamente")
 
@@ -92,6 +94,9 @@ def ensure_storage_media_columns():
 
 def ensure_duration_columns_are_float():
     """Permite guardar duraciones autodetectadas con decimales de minuto."""
+    if engine.dialect.name != "postgresql":
+        return
+
     inspector = inspect(engine)
     statements = []
     for table_name in ("contenidos", "episodios"):
@@ -116,6 +121,51 @@ def ensure_duration_columns_are_float():
     with engine.begin() as connection:
         for statement in statements:
             connection.execute(text(statement))
+
+
+def ensure_asset_media_columns():
+    """Agrega columnas para imagenes de catalogo si la BD ya existia."""
+    inspector = inspect(engine)
+    statements = []
+
+    if inspector.has_table("contenidos"):
+        columns = {column["name"] for column in inspector.get_columns("contenidos")}
+        if "portada_url" not in columns:
+            statements.append("ALTER TABLE contenidos ADD COLUMN portada_url VARCHAR")
+
+    if inspector.has_table("episodios"):
+        columns = {column["name"] for column in inspector.get_columns("episodios")}
+        if "thumbnail_url" not in columns:
+            statements.append("ALTER TABLE episodios ADD COLUMN thumbnail_url VARCHAR")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+def ensure_video_variant_quality_values():
+    """Alinea las calidades guardadas con las variantes generadas por FFmpeg."""
+    inspector = inspect(engine)
+    if not inspector.has_table("video_variants"):
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE video_variants SET quality = 'FHD' WHERE quality = 'HD'"))
+        connection.execute(text("UPDATE video_variants SET quality = 'QHD' WHERE quality = '1440p'"))
+        if engine.dialect.name != "postgresql":
+            return
+
+        connection.execute(text("ALTER TABLE video_variants DROP CONSTRAINT IF EXISTS ck_video_variant_quality"))
+        connection.execute(
+            text(
+                "ALTER TABLE video_variants "
+                "ADD CONSTRAINT ck_video_variant_quality "
+                "CHECK (quality IN ('FHD', 'QHD', '4K'))"
+            )
+        )
 
 
 def ensure_default_admin_account():

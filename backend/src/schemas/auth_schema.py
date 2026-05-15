@@ -7,13 +7,23 @@ class LoginSchema(BaseModel):
 
 
 class AdminLoginSchema(BaseModel):
-    username: str = Field(min_length=1, max_length=72)
+    username: str | None = Field(default=None, min_length=1, max_length=72)
     password: str = Field(min_length=8, max_length=72)
 
 
 class TokenSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    id: int | None = None
+    is_admin: bool = False
+    email: str | None = None
+
+
+class AuthAccountSchema(BaseModel):
+    id: int
+    email: str
+    plan: str
+    is_admin: bool
 
 
 class PinSchema(BaseModel):

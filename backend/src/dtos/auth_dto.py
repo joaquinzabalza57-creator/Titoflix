@@ -7,13 +7,23 @@ class LoginDTO(BaseModel):
 
 
 class AdminLoginDTO(BaseModel):
-    username: str
+    username: str | None = None
     password: str
 
 
 class TokenDTO(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    id: int | None = None
+    is_admin: bool = False
+    email: str | None = None
+
+
+class AuthAccountDTO(BaseModel):
+    id: int
+    email: str
+    plan: str
+    is_admin: bool
 
 
 class PinDTO(BaseModel):

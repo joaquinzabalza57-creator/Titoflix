@@ -58,7 +58,7 @@ La opcion `Resetear tablas de Postgres y buckets de MinIO` de `manager.bat` tamb
 - MinIO API S3: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
 
-El frontend usa `/api/v1` como ruta relativa y Next.js la proxyea al servicio `backend` dentro de Docker. Por eso, desde la UI las llamadas pasan por `http://localhost:3000/api/v1/...`, aunque Swagger siga disponible en `http://localhost:8000/docs`.
+El frontend llama al backend directamente en `http://localhost:8000/api/v1/...` desde el navegador. Swagger esta disponible en `http://localhost:8000/docs`.
 
 Credenciales de MinIO:
 
@@ -79,8 +79,8 @@ S3_SECRET_KEY=titoflix-secret
 S3_BUCKET_NAME=titoflix-media
 S3_REGION=us-east-1
 S3_MEDIA_PREFIX=media
-INTERNAL_BACKEND_URL=http://backend:8000
-NEXT_PUBLIC_API_URL=/api/v1
+INTERNAL_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ```
 
 El backend crea las tablas al arrancar. PostgreSQL guarda datos en el volumen `postgres_data` y MinIO guarda archivos en `minio_data`.
@@ -89,7 +89,7 @@ El backend crea las tablas al arrancar. PostgreSQL guarda datos en el volumen `p
 
 Se elimino la integracion con Google Drive. Los videos se suben a MinIO usando la API S3 y se guardan en el bucket `titoflix-media`, bajo el prefijo `media`.
 
-Cada pelicula y cada episodio tienen su propia carpeta en MinIO. Al subir un archivo, el backend lo toma como la calidad maxima disponible, detecta su resolucion y duracion con `ffprobe`, y genera con `ffmpeg` las variantes `HD`, `1440p` y `4K` sin pedir la calidad ni la duracion en la pantalla de administracion. Si el archivo fuente no llega a una resolucion alta, esa variante se conserva en la maxima resolucion disponible en vez de hacer upscale.
+Cada pelicula y cada episodio tienen su propia carpeta en MinIO. Al subir un archivo, el backend lo toma como la calidad maxima disponible, detecta su resolucion y duracion con `ffprobe`, y genera con `ffmpeg` las variantes `FHD`, `QHD` y `4K` sin pedir la calidad ni la duracion en la pantalla de administracion. Si el archivo fuente no llega a una resolucion alta, esa variante se conserva en la maxima resolucion disponible en vez de hacer upscale.
 
 Los endpoints de playback siguen devolviendo `stream_url` y `mime_type`. La transmision del video pasa por el backend, que lee desde MinIO y respeta requests con header `Range` para reproduccion parcial.
 

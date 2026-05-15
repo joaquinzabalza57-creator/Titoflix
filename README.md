@@ -17,7 +17,7 @@ URLs principales:
 - Swagger: `http://localhost:8000/docs`
 - MinIO Console: `http://localhost:9001`
 
-El frontend llama al backend mediante `/api/v1` en el mismo host del frontend. Next.js reenvia esas requests al contenedor `backend`, evitando problemas de CORS o URLs absolutas viejas en el navegador.
+El frontend llama al backend directamente en `http://localhost:8000/api/v1` desde el navegador.
 
 Tambien podes usar:
 

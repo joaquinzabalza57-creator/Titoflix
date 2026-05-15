@@ -1,4 +1,4 @@
-from .auth_dto import AdminLoginDTO, LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, PinDTO, TokenDTO
+from .auth_dto import AdminLoginDTO, AuthAccountDTO, LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, PinDTO, TokenDTO
 from .product_dto import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
@@ -18,6 +18,7 @@ from .product_dto import (
     UpdateProductDTO,
     UpdateTemporadaDTO,
     VideoVariantResponseDTO,
+    VideoProcessingWarningDTO,
     VistaResponseDTO,
 )
 from .user_dto import (
@@ -32,6 +33,7 @@ from .user_dto import (
 __all__ = [
     "LoginDTO",
     "AdminLoginDTO",
+    "AuthAccountDTO",
     "PinDTO",
     "PerfilAuthDTO",
     "PerfilAuthResponseDTO",
@@ -58,6 +60,7 @@ __all__ = [
     "CreateVistaDTO",
     "VistaResponseDTO",
     "VideoVariantResponseDTO",
+    "VideoProcessingWarningDTO",
     "CreateCalificacionDTO",
     "CalificacionResponseDTO",
     "MiListaDTO",

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from src.config import settings
-from src.dtos import AdminLoginDTO, LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, TokenDTO
+from src.dtos import AdminLoginDTO, AuthAccountDTO, LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, TokenDTO
 from src.repositories import CuentaRepository, PerfilRepository
 from src.utils import UnauthorizedError, create_access_token, verify_password
 
@@ -18,10 +18,16 @@ class AuthService:
             raise UnauthorizedError("Credenciales invalidas")
 
         token = create_access_token({"sub": str(cuenta.id), "email": cuenta.email})
-        return TokenDTO(access_token=token, token_type="bearer")
+        return TokenDTO(
+            access_token=token,
+            token_type="bearer",
+            id=cuenta.id,
+            is_admin=bool(cuenta.is_admin),
+            email=cuenta.email,
+        )
 
     def admin_login(self, dto: AdminLoginDTO) -> TokenDTO:
-        if dto.username != settings.ADMIN_USERNAME:
+        if dto.username is not None and dto.username != settings.ADMIN_USERNAME:
             raise UnauthorizedError("Credenciales admin invalidas")
 
         cuenta = self.cuenta_repo.find_by_email(settings.ADMIN_USERNAME)
@@ -35,7 +41,25 @@ class AuthService:
                 "admin": True,
             }
         )
-        return TokenDTO(access_token=token, token_type="bearer")
+        return TokenDTO(
+            access_token=token,
+            token_type="bearer",
+            id=cuenta.id,
+            is_admin=True,
+            email=cuenta.email,
+        )
+
+    def get_current_account(self, cuenta_id: int) -> AuthAccountDTO:
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
+        if not cuenta:
+            raise UnauthorizedError("Cuenta no encontrada")
+
+        return AuthAccountDTO(
+            id=cuenta.id,
+            email=cuenta.email,
+            plan=cuenta.plan,
+            is_admin=bool(cuenta.is_admin),
+        )
 
     def auth_perfil(
         self,

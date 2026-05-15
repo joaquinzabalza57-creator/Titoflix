@@ -1,42 +1,49 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { apiRequest, setSelectedProfile } from "@/lib/api";
 import type { Profile } from "@/lib/types";
 
 interface ProfileSelectorProps {
+  accountId: number;
+  accountPlan: "basico" | "estandar" | "premium";
   onProfileSelect: (profile: { id: number; nombre: string }) => void;
+  onNoProfiles: () => void;
+  onCreateProfile: () => void;
 }
 
-// Default guest profile
-const guestProfile: Profile = {
-  id: 0,
-  nombre: "Invitado",
-  user_id: 0,
+const planLimits = {
+  basico: 1,
+  estandar: 2,
+  premium: 5,
 };
 
-export function ProfileSelector({ onProfileSelect }: ProfileSelectorProps) {
-  const [profiles, setProfiles] = useState<Profile[]>([guestProfile]);
+export function ProfileSelector({ accountId, accountPlan, onProfileSelect, onNoProfiles, onCreateProfile }: ProfileSelectorProps) {
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const canCreateProfile = profiles.length < planLimits[accountPlan];
 
   useEffect(() => {
     async function fetchProfiles() {
       try {
-        const data = await apiRequest<Profile[]>("/perfiles");
-        if (data && data.length > 0) {
-          setProfiles(data);
+        const data = await apiRequest<Profile[]>(`/cuentas/${accountId}/perfiles`);
+        if (!data || data.length === 0) {
+          onNoProfiles();
+          return;
         }
-      } catch {
-        // Use default guest profile if fetch fails
-        setProfiles([guestProfile]);
+        setProfiles(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudieron cargar los perfiles");
       } finally {
         setLoading(false);
       }
     }
 
     fetchProfiles();
-  }, []);
+  }, [accountId, onNoProfiles]);
 
   const handleProfileSelect = (profile: Profile) => {
     const selectedProfile = { id: profile.id, nombre: profile.nombre };
@@ -60,6 +67,10 @@ export function ProfileSelector({ onProfileSelect }: ProfileSelectorProps) {
               <div className="w-20 h-4 bg-muted rounded animate-pulse" />
             </div>
           ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-lg border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary">
+          {error}
         </div>
       ) : (
         <div className="flex flex-wrap justify-center gap-6">
@@ -85,6 +96,24 @@ export function ProfileSelector({ onProfileSelect }: ProfileSelectorProps) {
               </span>
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              if (!canCreateProfile) {
+                setError("Si quieres crear un nuevo perfil, mejora tu plan");
+                return;
+              }
+              onCreateProfile();
+            }}
+            className="group flex flex-col items-center gap-3 focus:outline-none"
+          >
+            <div className="flex w-28 h-28 md:w-36 md:h-36 items-center justify-center rounded-lg border-2 border-dashed border-border bg-card transition-all duration-200 group-hover:border-tito-white group-focus:border-tito-white">
+              <Plus size={36} className="text-muted-foreground group-hover:text-foreground" />
+            </div>
+            <span className="text-muted-foreground group-hover:text-foreground transition-colors text-sm md:text-base">
+              Crear perfil
+            </span>
+          </button>
         </div>
       )}
     </div>

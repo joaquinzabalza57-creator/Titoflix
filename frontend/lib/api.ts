@@ -1,6 +1,6 @@
 // API configuration and utility functions for TITOFLIX
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "http://localhost:8000/api/v1";
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
@@ -20,6 +20,19 @@ export function getBackendUrl(path: string): string {
   return `${BACKEND_BASE_URL}${path}`;
 }
 
+export function getAssetUrl(path: string | null | undefined): string | null {
+  if (!path) {
+    return null;
+  }
+  if (path.startsWith("http") || path.startsWith("data:")) {
+    return path;
+  }
+  if (path.startsWith("assets/")) {
+    return getApiUrl(`/assets/${encodeURI(path.slice("assets/".length))}`);
+  }
+  return path;
+}
+
 export function getAuthHeaders(): HeadersInit {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("titoflix_token");
@@ -34,7 +47,7 @@ export async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const isFormData = options.body instanceof FormData;
-  const url = isFormData ? getDirectApiUrl(path) : getApiUrl(path);
+  const url = getApiUrl(path);
   const hasBody = options.body !== undefined && options.body !== null;
   const headers: HeadersInit = {
     ...getAuthHeaders(),
@@ -69,6 +82,15 @@ export async function apiRequest<T>(
     throw new Error(text.trim() || `Error ${response.status}`);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
@@ -81,6 +103,12 @@ export async function register(email: string, password: string, plan: "basico" |
 }
 
 // Auth
+export type StoredAccount = {
+  id?: number;
+  email: string;
+  is_admin: boolean;
+};
+
 export function isAuthenticated(): boolean {
   if (typeof window === "undefined") return false;
   return !!localStorage.getItem("titoflix_token");
@@ -99,14 +127,34 @@ export function removeToken(): void {
   localStorage.removeItem("titoflix_token");
 }
 
+export function getStoredAccount(): StoredAccount | null {
+  if (typeof window === "undefined") return null;
+  const account = localStorage.getItem("titoflix_account");
+  return account ? JSON.parse(account) : null;
+}
+
+export function setStoredAccount(account: StoredAccount): void {
+  localStorage.setItem("titoflix_account", JSON.stringify(account));
+}
+
+export function removeStoredAccount(): void {
+  localStorage.removeItem("titoflix_account");
+}
+
 // Profile
-export function getSelectedProfile(): { id: number; nombre: string } | null {
+export type StoredProfile = {
+  id: number;
+  nombre: string;
+  avatar?: string | null;
+};
+
+export function getSelectedProfile(): StoredProfile | null {
   if (typeof window === "undefined") return null;
   const profile = localStorage.getItem("titoflix_profile");
   return profile ? JSON.parse(profile) : null;
 }
 
-export function setSelectedProfile(profile: { id: number; nombre: string }): void {
+export function setSelectedProfile(profile: StoredProfile): void {
   localStorage.setItem("titoflix_profile", JSON.stringify(profile));
 }
 
@@ -116,5 +164,6 @@ export function removeSelectedProfile(): void {
 
 export function logout(): void {
   removeToken();
+  removeStoredAccount();
   removeSelectedProfile();
 }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, Play, Plus, Check, Star, Loader2, Film, Tv } from "lucide-react";
-import { apiRequest, getSelectedProfile, getBackendUrl } from "@/lib/api";
-import type { Contenido, Temporada, Episodio, PlaybackResponse, MiListaItem } from "@/lib/types";
+import { apiRequest, getSelectedProfile, getBackendUrl, getAssetUrl } from "@/lib/api";
+import type { Contenido, Temporada, Episodio, PlaybackResponse, MiListaItem, VideoVariant } from "@/lib/types";
 
 interface ContentDetailProps {
   content: Contenido;
@@ -19,6 +19,8 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
   const [playLoading, setPlayLoading] = useState<string | null>(null);
   const [inMiLista, setInMiLista] = useState(false);
   const [miListaLoading, setMiListaLoading] = useState(false);
+  const [selectedMovieQuality, setSelectedMovieQuality] = useState("");
+  const [selectedEpisodeQualities, setSelectedEpisodeQualities] = useState<Record<number, string>>({});
 
   const profile = getSelectedProfile();
 
@@ -61,10 +63,17 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
     }
   }, [content, profile]);
 
+  const movieQualities = qualityOptions(content.video_variants);
+  const portadaUrl = getAssetUrl(content.portada_url);
+
   const handlePlayMovie = async () => {
     setPlayLoading("movie");
     try {
-      const data = await apiRequest<PlaybackResponse>(`/contenidos/${content.id}/playback`);
+      const quality = selectedMovieQuality || movieQualities[0] || "";
+      const path = quality
+        ? `/contenidos/${content.id}/playback?quality=${encodeURIComponent(quality)}`
+        : `/contenidos/${content.id}/playback`;
+      const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
       onPlay(streamUrl, content.titulo);
     } catch (error) {
@@ -77,7 +86,12 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
   const handlePlayEpisode = async (episodio: Episodio) => {
     setPlayLoading(`ep-${episodio.id}`);
     try {
-      const data = await apiRequest<PlaybackResponse>(`/episodios/${episodio.id}/playback`);
+      const qualities = qualityOptions(episodio.video_variants);
+      const quality = selectedEpisodeQualities[episodio.id] || qualities[0] || "";
+      const path = quality
+        ? `/episodios/${episodio.id}/playback?quality=${encodeURIComponent(quality)}`
+        : `/episodios/${episodio.id}/playback`;
+      const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
       onPlay(streamUrl, `${content.titulo} - T${selectedTemporada?.numero} E${episodio.numero}: ${episodio.titulo}`);
     } catch (error) {
@@ -126,9 +140,9 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
 
         {/* Header with poster/background */}
         <div className="relative h-64 md:h-80">
-          {content.portada_url ? (
+          {portadaUrl ? (
             <img
-              src={content.portada_url}
+              src={portadaUrl}
               alt={content.titulo}
               className="w-full h-full object-cover"
             />
@@ -196,18 +210,34 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
           {/* Action buttons */}
           <div className="flex gap-3 mb-6">
             {content.tipo === "pelicula" && (
-              <button
-                onClick={handlePlayMovie}
-                disabled={playLoading === "movie"}
-                className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {playLoading === "movie" ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <Play size={20} fill="currentColor" />
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handlePlayMovie}
+                  disabled={playLoading === "movie"}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {playLoading === "movie" ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Play size={20} fill="currentColor" />
+                  )}
+                  Reproducir
+                </button>
+                {movieQualities.length > 0 && (
+                  <select
+                    className="rounded-lg border border-border bg-secondary px-3 py-3 text-sm font-semibold text-secondary-foreground outline-none focus:ring-2 focus:ring-primary"
+                    value={selectedMovieQuality || movieQualities[0]}
+                    onChange={(event) => setSelectedMovieQuality(event.target.value)}
+                    aria-label="Calidad de pelicula"
+                  >
+                    {movieQualities.map((quality) => (
+                      <option key={quality} value={quality}>
+                        {quality}
+                      </option>
+                    ))}
+                  </select>
                 )}
-                Reproducir
-              </button>
+              </div>
             )}
             <button
               onClick={handleToggleMiLista}
@@ -261,8 +291,15 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
                   {episodios.map((episodio) => (
                     <div
                       key={episodio.id}
-                      className="flex items-center justify-between p-4 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
+                      className="flex items-center justify-between gap-3 p-4 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
                     >
+                      {getAssetUrl(episodio.thumbnail_url) ? (
+                        <img
+                          src={getAssetUrl(episodio.thumbnail_url) || ""}
+                          alt=""
+                          className="h-16 w-28 flex-shrink-0 rounded-md object-cover"
+                        />
+                      ) : null}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">
@@ -278,6 +315,28 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
                           </p>
                         )}
                       </div>
+                      {qualityOptions(episodio.video_variants).length > 0 && (
+                        <select
+                          className="rounded-md border border-border bg-background px-2 py-2 text-xs font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary"
+                          value={
+                            selectedEpisodeQualities[episodio.id] ||
+                            qualityOptions(episodio.video_variants)[0]
+                          }
+                          onChange={(event) =>
+                            setSelectedEpisodeQualities((current) => ({
+                              ...current,
+                              [episodio.id]: event.target.value,
+                            }))
+                          }
+                          aria-label={`Calidad de ${episodio.titulo}`}
+                        >
+                          {qualityOptions(episodio.video_variants).map((quality) => (
+                            <option key={quality} value={quality}>
+                              {quality}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         onClick={() => handlePlayEpisode(episodio)}
                         disabled={playLoading === `ep-${episodio.id}`}
@@ -307,4 +366,14 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
       </div>
     </div>
   );
+}
+
+function qualityOptions(variants: VideoVariant[] | undefined): string[] {
+  return [...(variants || [])]
+    .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality))
+    .map((variant) => variant.quality);
+}
+
+function qualityRank(quality: string): number {
+  return { FHD: 1, QHD: 2, "4K": 3 }[quality] || 0;
 }

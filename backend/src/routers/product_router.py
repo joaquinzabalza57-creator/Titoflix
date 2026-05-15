@@ -127,8 +127,8 @@ def create_contenido(
     anio: int = Form(...),
     clasificacion_edad: str = Form(...),
     descripcion: str | None = Form(default=None),
-    duracion_min: float | None = Form(default=None),
     generos_ids: list[int] = Form(...),
+    portada: UploadFile | None = File(default=None),
     video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -138,12 +138,11 @@ def create_contenido(
         tipo=tipo,
         anio=anio,
         descripcion=descripcion,
-        duracion_min=duracion_min,
         clasificacion_edad=clasificacion_edad,
         generos_ids=generos_ids,
     )
 
-    return ContenidoService(db).create_with_video(dto, video)
+    return ContenidoService(db).create_with_video(dto, video, portada)
 
 
 @router.get("/contenidos", response_model=list[ContenidoResponseDTO])
@@ -203,8 +202,8 @@ def update_contenido(
     anio: int = Form(...),
     clasificacion_edad: str = Form(...),
     descripcion: str | None = Form(default=None),
-    duracion_min: float | None = Form(default=None),
     generos_ids: list[int] = Form(...),
+    portada: UploadFile | None = File(default=None),
     video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -213,12 +212,11 @@ def update_contenido(
         titulo=titulo,
         anio=anio,
         descripcion=descripcion,
-        duracion_min=duracion_min,
         clasificacion_edad=clasificacion_edad,
         generos_ids=generos_ids,
     )
 
-    return ContenidoService(db).update_with_video(contenido_id, dto, video)
+    return ContenidoService(db).update_with_video(contenido_id, dto, video, portada)
 
 
 @router.delete("/contenidos/{contenido_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -279,7 +277,6 @@ def create_episodio(
     temporada_id: int = Form(...),
     numero: int = Form(...),
     titulo: str = Form(...),
-    duracion_min: float | None = Form(default=None),
     video: UploadFile = File(...),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -288,7 +285,6 @@ def create_episodio(
         temporada_id=temporada_id,
         numero=numero,
         titulo=titulo,
-        duracion_min=duracion_min,
     )
 
     return EpisodioService(db).create_with_video(dto, video)
@@ -333,12 +329,11 @@ def update_episodio(
     episodio_id: int,
     numero: int = Form(...),
     titulo: str = Form(...),
-    duracion_min: float | None = Form(default=None),
     video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    dto = UpdateEpisodioDTO(numero=numero, titulo=titulo, duracion_min=duracion_min)
+    dto = UpdateEpisodioDTO(numero=numero, titulo=titulo)
     return EpisodioService(db).update_with_video(episodio_id, dto, video)
 
 

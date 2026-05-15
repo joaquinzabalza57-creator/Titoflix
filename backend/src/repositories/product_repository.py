@@ -51,6 +51,7 @@ class ContenidoRepository:
         video_storage_key: str | None = None,
         video_mime: str | None = None,
         video_size: int | None = None,
+        portada_url: str | None = None,
     ) -> Contenido:
         contenido = Contenido(
             titulo=titulo,
@@ -63,6 +64,7 @@ class ContenidoRepository:
             video_storage_key=video_storage_key,
             video_mime=video_mime,
             video_size=video_size,
+            portada_url=portada_url,
         )
 
         if generos_ids:
@@ -345,6 +347,7 @@ class EpisodioRepository:
         video_storage_key: str | None = None,
         video_mime: str | None = None,
         video_size: int | None = None,
+        thumbnail_url: str | None = None,
     ) -> Episodio:
         episodio = Episodio(
             temporada_id=temporada_id,
@@ -355,6 +358,7 @@ class EpisodioRepository:
             video_storage_key=video_storage_key,
             video_mime=video_mime,
             video_size=video_size,
+            thumbnail_url=thumbnail_url,
         )
         self.db.add(episodio)
         self.db.commit()

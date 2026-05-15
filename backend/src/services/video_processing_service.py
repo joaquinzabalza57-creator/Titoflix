@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import random
 import shutil
 import subprocess
 import tempfile
@@ -12,13 +13,13 @@ from src.utils import ConflictError
 
 
 QUALITY_HEIGHTS = {
-    "HD": 720,
-    "1440p": 1440,
+    "FHD": 1080,
+    "QHD": 1440,
     "4K": 2160,
 }
 QUALITY_PRIORITY = {
-    "HD": 1,
-    "1440p": 2,
+    "FHD": 1,
+    "QHD": 2,
     "4K": 3,
 }
 
@@ -29,6 +30,10 @@ class ProcessedVideoVariants:
     max_variant: StorageFileUploadResult
     variants: dict[str, StorageFileUploadResult]
     duration_min: float
+    source_quality: str
+    warning_message: str | None = None
+    thumbnail: bytes | None = None
+    thumbnail_mime: str = "image/jpeg"
 
 
 class VideoProcessingService:
@@ -52,11 +57,18 @@ class VideoProcessingService:
             metadata = self._probe_video_metadata(source_path)
             source_height = metadata["height"]
             duration_min = round(metadata["duration_seconds"] / 60, 2)
+            source_quality = self._quality_for_height(source_height)
+            allowed_qualities = [
+                quality
+                for quality, target_height in QUALITY_HEIGHTS.items()
+                if target_height <= QUALITY_HEIGHTS[source_quality]
+            ]
             variants: dict[str, StorageFileUploadResult] = {}
 
-            for quality, target_height in QUALITY_HEIGHTS.items():
+            for quality in allowed_qualities:
+                target_height = QUALITY_HEIGHTS[quality]
                 output_path = temp_path / f"{quality}.mp4"
-                self._transcode(source_path, output_path, min(source_height, target_height))
+                self._transcode(source_path, output_path, target_height)
 
                 variants[quality] = self.storage.upload_video_variant(
                     file_path=output_path,
@@ -66,11 +78,25 @@ class VideoProcessingService:
                 )
 
             max_quality = max(variants, key=lambda quality: QUALITY_PRIORITY[quality])
+            thumbnail = self._extract_thumbnail(
+                source_path=source_path,
+                output_path=temp_path / "thumbnail.jpg",
+                duration_seconds=metadata["duration_seconds"],
+            )
+            warning_message = None
+            if source_quality != "4K":
+                warning_message = (
+                    f"El video que se subio era de calidad {source_quality}, "
+                    "por lo que no se pudieron crear las calidades superiores."
+                )
             return ProcessedVideoVariants(
                 max_quality=max_quality,
                 max_variant=variants[max_quality],
                 variants=variants,
                 duration_min=max(duration_min, 0.01),
+                source_quality=source_quality,
+                warning_message=warning_message,
+                thumbnail=thumbnail,
             )
 
     def _validate_tools(self) -> None:
@@ -112,6 +138,13 @@ class VideoProcessingService:
             "duration_seconds": duration_seconds,
         }
 
+    def _quality_for_height(self, height: int) -> str:
+        if height >= QUALITY_HEIGHTS["4K"]:
+            return "4K"
+        if height >= QUALITY_HEIGHTS["QHD"]:
+            return "QHD"
+        return "FHD"
+
     def _transcode(self, source_path: Path, output_path: Path, target_height: int) -> None:
         command = [
             "ffmpeg",
@@ -137,3 +170,23 @@ class VideoProcessingService:
         result = subprocess.run(command, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             raise ConflictError("No se pudo convertir el video con FFmpeg")
+
+    def _extract_thumbnail(self, source_path: Path, output_path: Path, duration_seconds: float) -> bytes:
+        seek_second = max(1, int(random.uniform(duration_seconds * 0.1, duration_seconds * 0.75)))
+        command = [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(seek_second),
+            "-i",
+            str(source_path),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "3",
+            str(output_path),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        if result.returncode != 0 or not output_path.exists():
+            raise ConflictError("No se pudo generar la miniatura del video")
+        return output_path.read_bytes()

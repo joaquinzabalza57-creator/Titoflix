@@ -12,12 +12,14 @@ from src.dtos import (
     CreateVistaDTO,
     EpisodioResponseDTO,
     GeneroResponseDTO,
+    VideoProcessingWarningDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
     UpdateEpisodioDTO,
     UpdateTemporadaDTO,
     VistaResponseDTO,
 )
+from src.config.env import settings
 from src.mappers import (
     to_calificacion_response,
     to_contenido_response,
@@ -61,6 +63,12 @@ def _variant_uploads_to_payload(variants) -> dict[str, dict]:
     }
 
 
+def _processing_warning(source_quality: str, message: str | None) -> VideoProcessingWarningDTO | None:
+    if not message:
+        return None
+    return VideoProcessingWarningDTO(message=message, source_quality=source_quality)
+
+
 class GeneroService:
     def __init__(self, db: Session):
         self.genero_repo = GeneroRepository(db)
@@ -98,6 +106,7 @@ class ContenidoService:
         self,
         dto: CreateContenidoDTO,
         video_file: UploadFile | None,
+        portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
         self._validate_content_payload(
             tipo=dto.tipo,
@@ -135,13 +144,23 @@ class ContenidoService:
             video_storage_key=video.object_key if video else None,
             video_mime=video.mime_type if video else None,
             video_size=video.size if video else None,
+            portada_url=None,
         )
+        if portada_file is not None:
+            portada_url = self._store_portada(portada_file, contenido.id)
+            contenido = self.contenido_repo.update(contenido.id, portada_url=portada_url) or contenido
         if video and dto.tipo == "pelicula":
             self.video_variant_repo.replace_for_contenido(
                 contenido_id=contenido.id,
                 variants=_variant_uploads_to_payload(processed_video.variants),
             )
-        return to_contenido_response(contenido)
+        response = to_contenido_response(contenido)
+        if video and dto.tipo == "pelicula":
+            response.processing_warning = _processing_warning(
+                processed_video.source_quality,
+                processed_video.warning_message,
+            )
+        return response
 
     def get_by_id(self, contenido_id: int) -> ContenidoResponseDTO:
         contenido = self.contenido_repo.find_by_id(contenido_id)
@@ -176,12 +195,14 @@ class ContenidoService:
         contenido_id: int,
         dto: UpdateContenidoDTO,
         video_file: UploadFile | None,
+        portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
         contenido_actual = self.contenido_repo.find_by_id(contenido_id)
         if not contenido_actual:
             raise NotFoundError("Contenido no encontrado")
 
         fields = dto.model_dump(exclude_unset=True, exclude_none=True)
+        fields.pop("duracion_min", None)
         if "tipo" in fields and fields["tipo"] != contenido_actual.tipo:
             raise ConflictError("No se puede cambiar el tipo de contenido")
 
@@ -211,15 +232,44 @@ class ContenidoService:
             fields["video_size"] = video.size
             fields["duracion_min"] = processed_video.duration_min
 
+        if portada_file is not None:
+            portada_url = self._store_portada(portada_file, contenido_id)
+            self._delete_asset(contenido_actual.portada_url)
+            fields["portada_url"] = portada_url
+
         contenido = self.contenido_repo.update(contenido_id, **fields)
         if video_file is not None:
             self.video_variant_repo.replace_for_contenido(
                 contenido_id=contenido.id,
                 variants=_variant_uploads_to_payload(processed_video.variants),
             )
-        return to_contenido_response(contenido)
+        response = to_contenido_response(contenido)
+        if video_file is not None:
+            response.processing_warning = _processing_warning(
+                processed_video.source_quality,
+                processed_video.warning_message,
+            )
+        return response
 
     def delete(self, contenido_id: int) -> None:
+        contenido = self.contenido_repo.find_by_id(contenido_id)
+        if not contenido:
+            raise NotFoundError("Contenido no encontrado")
+
+        storage = StorageService()
+        storage.delete_prefix(contenido.storage_folder_id)
+        storage.delete_prefix(f"{settings.S3_ASSETS_PREFIX.strip('/')}/contenidos/{contenido_id}")
+        storage.delete_object(contenido.video_storage_key)
+        for variant in contenido.video_variants:
+            storage.delete_object(variant.video_storage_key)
+        for temporada in contenido.temporadas:
+            storage.delete_prefix(temporada.storage_folder_id)
+            for episodio in temporada.episodios:
+                storage.delete_prefix(episodio.storage_folder_id)
+                storage.delete_object(episodio.video_storage_key)
+                for variant in episodio.video_variants:
+                    storage.delete_object(variant.video_storage_key)
+
         if not self.contenido_repo.delete(contenido_id):
             raise NotFoundError("Contenido no encontrado")
 
@@ -284,6 +334,18 @@ class ContenidoService:
             return next((variant for variant in variants if variant.quality == quality), None)
         return sorted(variants, key=lambda variant: QUALITY_PRIORITY.get(variant.quality, 0), reverse=True)[0]
 
+    def _store_portada(self, portada_file: UploadFile, contenido_id: int) -> str:
+        return StorageService().upload_asset_file(
+            file=portada_file.file,
+            filename=portada_file.filename or "portada",
+            mime_type=portada_file.content_type or "application/octet-stream",
+            asset_prefix=f"{settings.S3_ASSETS_PREFIX.strip('/')}/contenidos/{contenido_id}/portadas",
+        ).object_key
+
+    def _delete_asset(self, asset_key: str | None) -> None:
+        if asset_key and asset_key.startswith(f"{settings.S3_ASSETS_PREFIX.strip('/')}/"):
+            StorageService().delete_object(asset_key)
+
 
 class TemporadaService:
     def __init__(self, db: Session):
@@ -328,6 +390,21 @@ class TemporadaService:
         return to_temporada_response(temporada)
 
     def delete(self, temporada_id: int) -> None:
+        temporada = self.temporada_repo.find_by_id(temporada_id)
+        if not temporada:
+            raise NotFoundError("Temporada no encontrada")
+
+        storage = StorageService()
+        storage.delete_prefix(temporada.storage_folder_id)
+        storage.delete_prefix(
+            f"{settings.S3_ASSETS_PREFIX.strip('/')}/contenidos/{temporada.contenido_id}/temporadas/{temporada.id}"
+        )
+        for episodio in temporada.episodios:
+            storage.delete_prefix(episodio.storage_folder_id)
+            storage.delete_object(episodio.video_storage_key)
+            for variant in episodio.video_variants:
+                storage.delete_object(variant.video_storage_key)
+
         if not self.temporada_repo.delete(temporada_id):
             raise NotFoundError("Temporada no encontrada")
 
@@ -378,12 +455,24 @@ class EpisodioService:
             video_storage_key=video.object_key,
             video_mime=video.mime_type,
             video_size=video.size,
+            thumbnail_url=None,
         )
+        thumbnail_url = self._store_episode_thumbnail(
+            processed_video=processed_video,
+            episodio_id=episodio.id,
+            temporada=temporada,
+        )
+        episodio = self.episodio_repo.update(episodio.id, thumbnail_url=thumbnail_url) or episodio
         self.video_variant_repo.replace_for_episodio(
             episodio_id=episodio.id,
             variants=_variant_uploads_to_payload(processed_video.variants),
         )
-        return to_episodio_response(episodio)
+        response = to_episodio_response(episodio)
+        response.processing_warning = _processing_warning(
+            processed_video.source_quality,
+            processed_video.warning_message,
+        )
+        return response
 
     def list_by_temporada(self, temporada_id: int) -> list[EpisodioResponseDTO]:
         if not self.temporada_repo.find_by_id(temporada_id):
@@ -395,6 +484,7 @@ class EpisodioService:
 
     def update(self, episodio_id: int, dto: UpdateEpisodioDTO) -> EpisodioResponseDTO:
         fields = dto.model_dump(exclude_unset=True, exclude_none=True)
+        fields.pop("duracion_min", None)
         episodio = self.episodio_repo.update(episodio_id, **fields)
         if not episodio:
             raise NotFoundError("Episodio no encontrado")
@@ -407,6 +497,7 @@ class EpisodioService:
         video_file: UploadFile | None,
     ) -> EpisodioResponseDTO:
         fields = dto.model_dump(exclude_unset=True, exclude_none=True)
+        fields.pop("duracion_min", None)
         episodio = self.episodio_repo.find_by_id(episodio_id)
         if not episodio:
             raise NotFoundError("Episodio no encontrado")
@@ -428,6 +519,13 @@ class EpisodioService:
             fields["video_mime"] = video.mime_type
             fields["video_size"] = video.size
             fields["duracion_min"] = processed_video.duration_min
+            thumbnail_url = self._store_episode_thumbnail(
+                processed_video=processed_video,
+                episodio_id=episodio.id,
+                temporada=episodio.temporada,
+            )
+            self._delete_asset(episodio.thumbnail_url)
+            fields["thumbnail_url"] = thumbnail_url
 
         episodio = self.episodio_repo.update(episodio_id, **fields)
         if video_file is not None:
@@ -435,9 +533,28 @@ class EpisodioService:
                 episodio_id=episodio.id,
                 variants=_variant_uploads_to_payload(processed_video.variants),
             )
-        return to_episodio_response(episodio)
+        response = to_episodio_response(episodio)
+        if video_file is not None:
+            response.processing_warning = _processing_warning(
+                processed_video.source_quality,
+                processed_video.warning_message,
+            )
+        return response
 
     def delete(self, episodio_id: int) -> None:
+        episodio = self.episodio_repo.find_by_id(episodio_id)
+        if not episodio:
+            raise NotFoundError("Episodio no encontrado")
+
+        storage = StorageService()
+        storage.delete_prefix(episodio.storage_folder_id)
+        storage.delete_prefix(
+            f"{settings.S3_ASSETS_PREFIX.strip('/')}/contenidos/{episodio.temporada.contenido_id}/temporadas/{episodio.temporada_id}/episodios/{episodio.id}"
+        )
+        storage.delete_object(episodio.video_storage_key)
+        for variant in episodio.video_variants:
+            storage.delete_object(variant.video_storage_key)
+
         if not self.episodio_repo.delete(episodio_id):
             raise NotFoundError("Episodio no encontrado")
 
@@ -474,6 +591,24 @@ class EpisodioService:
         if quality:
             return next((variant for variant in variants if variant.quality == quality), None)
         return sorted(variants, key=lambda variant: QUALITY_PRIORITY.get(variant.quality, 0), reverse=True)[0]
+
+    def _store_episode_thumbnail(self, processed_video, episodio_id: int, temporada) -> str | None:
+        if not processed_video.thumbnail:
+            return None
+
+        return StorageService().upload_asset_bytes(
+            payload=processed_video.thumbnail,
+            filename=f"episodio-{episodio_id}-thumbnail.jpg",
+            mime_type=processed_video.thumbnail_mime,
+            asset_prefix=(
+                f"{settings.S3_ASSETS_PREFIX.strip('/')}/contenidos/{temporada.contenido_id}/"
+                f"temporadas/{temporada.id}/episodios/{episodio_id}/miniaturas"
+            ),
+        ).object_key
+
+    def _delete_asset(self, asset_key: str | None) -> None:
+        if asset_key and asset_key.startswith(f"{settings.S3_ASSETS_PREFIX.strip('/')}/"):
+            StorageService().delete_object(asset_key)
 
 
 class VistaService:
