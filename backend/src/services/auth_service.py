@@ -17,7 +17,13 @@ class AuthService:
         if not cuenta or not verify_password(dto.password, cuenta.password_hash):
             raise UnauthorizedError("Credenciales invalidas")
 
-        token = create_access_token({"sub": str(cuenta.id), "email": cuenta.email})
+        token = create_access_token(
+            {
+                "sub": str(cuenta.id),
+                "email": cuenta.email,
+                "admin": bool(cuenta.is_admin),
+            }
+        )
         return TokenDTO(
             access_token=token,
             token_type="bearer",
@@ -27,12 +33,24 @@ class AuthService:
         )
 
     def admin_login(self, dto: AdminLoginDTO) -> TokenDTO:
-        if dto.username is not None and dto.username != settings.ADMIN_USERNAME:
-            raise UnauthorizedError("Credenciales admin invalidas")
+        cuenta = None
 
-        cuenta = self.cuenta_repo.find_by_email(settings.ADMIN_USERNAME)
-        if not cuenta or not cuenta.is_admin or not verify_password(dto.password, cuenta.password_hash):
-            raise UnauthorizedError("Credenciales admin invalidas")
+        if dto.username:
+            cuenta = self.cuenta_repo.find_by_email(dto.username)
+            if not cuenta or not cuenta.is_admin:
+                raise UnauthorizedError("Credenciales admin invalidas")
+
+            if not verify_password(dto.password, cuenta.password_hash):
+                raise UnauthorizedError("Credenciales admin invalidas")
+        else:
+            admins = self.cuenta_repo.list_admins()
+            for admin in admins:
+                if verify_password(dto.password, admin.password_hash):
+                    cuenta = admin
+                    break
+
+            if not cuenta:
+                raise UnauthorizedError("Credenciales admin invalidas")
 
         token = create_access_token(
             {

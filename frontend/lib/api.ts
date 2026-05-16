@@ -1,8 +1,11 @@
 // API configuration and utility functions for TITOFLIX
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "/api/v1";
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+
+// Max upload size (bytes). Can be overridden at build time with NEXT_PUBLIC_MAX_UPLOAD_SIZE.
+export const MAX_UPLOAD_SIZE = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 10 * 1024 * 1024; // 10MB
 
 export function getApiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -58,6 +61,40 @@ export async function apiRequest<T>(
     (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
+  // Client-side check to avoid sending bodies larger than MAX_UPLOAD_SIZE.
+  if (hasBody) {
+    try {
+      let bodySize = 0;
+      if (isFormData && typeof FormData !== "undefined") {
+        const fd = options.body as FormData;
+        for (const entry of fd.entries()) {
+          const value = entry[1] as any;
+          if (typeof File !== "undefined" && value instanceof File) {
+            bodySize += value.size || 0;
+          } else if (typeof value === "string") {
+            bodySize += new Blob([value]).size;
+          }
+        }
+      } else if (typeof options.body === "string") {
+        bodySize = new Blob([options.body]).size;
+      } else if (typeof options.body === "object") {
+        // Fallback for objects that weren't stringified by the caller.
+        try {
+          const text = JSON.stringify(options.body as any);
+          bodySize = new Blob([text]).size;
+        } catch {}
+      }
+
+      if (bodySize > MAX_UPLOAD_SIZE) {
+        const actualMB = Math.round((bodySize / 1024 / 1024) * 10) / 10;
+        const allowedMB = Math.round((MAX_UPLOAD_SIZE / 1024 / 1024) * 10) / 10;
+        throw new Error(`El archivo es demasiado grande (${actualMB}MB). Tamaño máximo permitido: ${allowedMB}MB.`);
+      }
+    } catch (err) {
+      if (err instanceof Error) throw err;
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
@@ -65,7 +102,7 @@ export async function apiRequest<T>(
       headers,
     });
   } catch {
-    throw new Error("No se pudo conectar con el backend. Verifica que Docker este corriendo y que el backend este en http://localhost:8000.");
+    throw new Error("No se pudo conectar con el backend. Verifica que Docker esté corriendo y que la app esté configurada para usar la IP del servidor.");
   }
 
   if (!response.ok) {

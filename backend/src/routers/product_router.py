@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.db import get_db
-from src.db.models import Cuenta
+from src.db.models import Cuenta, Perfil
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
@@ -18,7 +18,7 @@ from src.dtos import (
     UpdateContenidoDTO,
     VistaResponseDTO,
 )
-from src.middlewares import require_admin
+from src.middlewares import get_owned_profile, require_admin
 from src.schemas.product_schema import (
     CreateEpisodioSchema,
     CreateTemporadaSchema,
@@ -345,10 +345,11 @@ def update_episodio(
 def create_vista_recurso(
     perfil_id: int,
     payload: UpsertVistaSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         payload=payload,
     )
     return VistaService(db).create_or_update(dto)
@@ -361,10 +362,11 @@ def create_vista_recurso(
 def update_vista_recurso(
     perfil_id: int,
     payload: UpsertVistaSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         payload=payload,
     )
     return VistaService(db).create_or_update(dto)
@@ -378,10 +380,11 @@ def delete_vista_recurso(
     perfil_id: int,
     episodio_id: int | None = None,
     contenido_id: int | None = None,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     VistaService(db).delete(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         episodio_id=episodio_id,
         contenido_id=contenido_id,
     )
@@ -390,35 +393,39 @@ def delete_vista_recurso(
 @router.get("/perfiles/{perfil_id}/continuar", response_model=list[VistaResponseDTO])
 def continuar_viendo(
     perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return VistaService(db).continuar_viendo(perfil_id)
+    return VistaService(db).continuar_viendo(profile.id)
 
 
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).add(perfil_id, contenido_id)
+    return MiListaService(db).add(profile.id, contenido_id)
 
 
 @router.get("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def get_mi_lista(
     perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).list(perfil_id)
+    return MiListaService(db).list(profile.id)
 
 
 @router.delete("/perfiles/{perfil_id}/mi-lista/{contenido_id}", response_model=list[ContenidoResponseDTO])
 def remove_from_mi_lista(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).remove(perfil_id, contenido_id)
+    return MiListaService(db).remove(profile.id, contenido_id)
 
 
 @router.post(
@@ -430,9 +437,10 @@ def create_calificacion(
     perfil_id: int,
     contenido_id: int,
     payload: UpsertCalificacionSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    dto = _calificacion_dto_from_request(profile.id, contenido_id, payload)
     return CalificacionService(db).create_or_update(dto)
 
 
@@ -444,9 +452,10 @@ def update_calificacion(
     perfil_id: int,
     contenido_id: int,
     payload: UpsertCalificacionSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    dto = _calificacion_dto_from_request(profile.id, contenido_id, payload)
     return CalificacionService(db).create_or_update(dto)
 
 
@@ -457,6 +466,7 @@ def update_calificacion(
 def delete_calificacion(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    CalificacionService(db).delete(perfil_id, contenido_id)
+    CalificacionService(db).delete(profile.id, contenido_id)

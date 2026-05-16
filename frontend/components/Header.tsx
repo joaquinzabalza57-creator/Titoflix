@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, User, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
-import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile } from "@/lib/api";
+import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import type { AuthAccount, Profile } from "@/lib/types";
 
 interface HeaderProps {
@@ -485,6 +485,11 @@ function AccountSettingsModal({
 
   const handleAvatarChange = (file: File | undefined) => {
     if (!file) return;
+    if (file.size > MAX_UPLOAD_SIZE) {
+      const allowedMB = Math.round((MAX_UPLOAD_SIZE / 1024 / 1024) * 10) / 10;
+      setError(`El archivo es demasiado grande. Tamaño máximo: ${allowedMB}MB.`);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => setAvatar(typeof reader.result === "string" ? reader.result : null);
     reader.readAsDataURL(file);

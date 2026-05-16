@@ -9,6 +9,7 @@ from src.services.conductores_service import ConductoresService
 router = APIRouter(prefix="/conductores", tags=["conductores"])
 
 
+@router.post("", response_model=ConductoresResponseDTO, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ConductoresResponseDTO, status_code=status.HTTP_201_CREATED)
 def create_conductor(payload: CreateConductoresSchema, db: Session = Depends(get_db)):
     """Crea un nuevo conductor."""

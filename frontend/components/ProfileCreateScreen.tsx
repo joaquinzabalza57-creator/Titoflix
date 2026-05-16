@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { apiRequest, getAssetUrl, setSelectedProfile } from "@/lib/api";
+import { apiRequest, getAssetUrl, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import type { Profile } from "@/lib/types";
 
 interface ProfileCreateScreenProps {
@@ -24,6 +24,12 @@ export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, com
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setError("El avatar debe ser una imagen");
+      return;
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      const allowedMB = Math.round((MAX_UPLOAD_SIZE / 1024 / 1024) * 10) / 10;
+      setError(`El archivo es demasiado grande. Tamaño máximo: ${allowedMB}MB.`);
       return;
     }
 
@@ -52,7 +58,6 @@ export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, com
       const profile = await apiRequest<Profile>("/cuentas/perfiles", {
         method: "POST",
         body: JSON.stringify({
-          cuenta_id: accountId,
           nombre: cleanName,
           pin: cleanPin || null,
           avatar,

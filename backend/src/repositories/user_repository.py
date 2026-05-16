@@ -25,6 +25,9 @@ class CuentaRepository:
     def find_by_email(self, email: str) -> Cuenta | None:                # Busca cuenta por email
         return self.db.query(Cuenta).filter(Cuenta.email == email).first()
 
+    def list_admins(self) -> list[Cuenta]:                                 # Lista todas las cuentas admin
+        return self.db.query(Cuenta).filter(Cuenta.is_admin.is_(True)).all()
+
     def list_all(self) -> list[Cuenta]:                                  # Obtiene todos los registros de cuentas
         return self.db.query(Cuenta).all()
 

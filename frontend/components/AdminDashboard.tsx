@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Film, Loader2, LogOut, Play, Plus, RefreshCw, Tv, Upload } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { apiRequest, getAssetUrl, getBackendUrl, logout } from "@/lib/api";
+import { apiRequest, getAssetUrl, getBackendUrl, logout, MAX_UPLOAD_SIZE } from "@/lib/api";
 import type { Contenido, Episodio, Genero, PlaybackResponse, Temporada, VideoVariant } from "@/lib/types";
 
 interface AdminDashboardProps {
@@ -1358,7 +1358,20 @@ function FilePicker({
         accept={accept}
         aria-required={required}
         className="sr-only"
-        onChange={(event) => onChange(event.target.files?.[0]?.name || "")}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Only enforce MAX_UPLOAD_SIZE for images (avatars, portada).
+          const shouldEnforceSize = accept && accept.includes("image");
+          if (file && shouldEnforceSize && file.size > MAX_UPLOAD_SIZE) {
+            const allowedMB = Math.round((MAX_UPLOAD_SIZE / 1024 / 1024) * 10) / 10;
+            alert(`El archivo es demasiado grande. Tamaño máximo: ${allowedMB}MB.`);
+            // reset input
+            event.currentTarget.value = "";
+            onChange("");
+            return;
+          }
+          onChange(file?.name || "");
+        }}
       />
     </div>
   );

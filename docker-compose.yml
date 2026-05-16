@@ -50,16 +50,17 @@ services:
       ENVIRONMENT: production
       HOST: 0.0.0.0
       PORT: 8000
+      HOST_IP: ${HOST_IP:-127.0.0.1}
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/titoflix
       JWT_SECRET: cambiame-en-produccion
       S3_ENDPOINT_URL: http://minio:9000
-      S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      S3_PUBLIC_ENDPOINT_URL: http://${HOST_IP:-127.0.0.1}:9000
       S3_ACCESS_KEY: titoflix
       S3_SECRET_KEY: titoflix-secret
       S3_BUCKET_NAME: titoflix-media
       S3_REGION: us-east-1
       S3_MEDIA_PREFIX: media
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      CORS_ORIGINS: http://${HOST_IP:-127.0.0.1}:3000,http://localhost:3000,http://127.0.0.1:3000
       ADMIN_USERNAME: titoflix-admin
       ADMIN_PASSWORD: admin1234
     ports:
@@ -74,12 +75,12 @@ services:
     build:
       context: ./frontend
       args:
-        INTERNAL_BACKEND_URL: http://localhost:8000
+        INTERNAL_BACKEND_URL: http://host.docker.internal:8000
     container_name: titoflix-frontend
     environment:
-      INTERNAL_BACKEND_URL: http://localhost:8000
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
-      NEXT_PUBLIC_DIRECT_API_URL: http://localhost:8000/api/v1
+      INTERNAL_BACKEND_URL: http://host.docker.internal:8000
+      NEXT_PUBLIC_API_URL: /api/v1
+      NEXT_PUBLIC_DIRECT_API_URL: /api/v1
       NEXT_PUBLIC_BACKEND_URL: ""
     ports:
       - "3000:3000"

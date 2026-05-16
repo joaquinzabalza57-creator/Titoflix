@@ -34,6 +34,7 @@ if "%option%"=="10" goto end
 goto menu
 
 :start
+call :write_host_ip
 docker compose up -d
 pause
 goto menu
@@ -65,6 +66,7 @@ pause
 goto menu
 
 :rebuild
+call :write_host_ip
 docker compose up -d --build
 pause
 goto menu
@@ -79,6 +81,12 @@ docker compose exec backend python -c "from src.db import reset_database; reset_
 docker compose run --rm --entrypoint /bin/sh minio-init -c "until mc alias set local http://minio:9000 titoflix titoflix-secret; do sleep 2; done && mc rb --force local/titoflix-media || true && mc mb --ignore-existing local/titoflix-media"
 pause
 goto menu
+
+:write_host_ip
+set "HOST_IP=127.0.0.1"
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"
+echo HOST_IP=%HOST_IP% > .env
+goto :eof
 
 :end
 endlocal

@@ -12,7 +12,7 @@ from src.utils.errors import AppError
 
 API_PREFIX = "/api/v1"
 
-app = FastAPI(title="Titoflix API", version="1.0.0")
+app = FastAPI(title="Titoflix API", version="1.0.0", redirect_slashes=False)
 
 allowed_origins = [
     origin.strip()
