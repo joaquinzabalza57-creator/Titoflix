@@ -48,6 +48,7 @@ export default function BrowseLayout({
     if (pathname.startsWith("/peliculas")) return "peliculas";
     if (pathname.startsWith("/series")) return "series";
     if (pathname.startsWith("/mi-lista")) return "mi-lista";
+    if (pathname.startsWith("/buscar")) return "buscar";
     return "inicio";
   };
 

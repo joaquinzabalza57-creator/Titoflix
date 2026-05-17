@@ -204,3 +204,40 @@ export function logout(): void {
   removeStoredAccount();
   removeSelectedProfile();
 }
+
+// ─── HU5: Content search with filters ───────────────────────────────────────
+
+export interface ContentSearchParams {
+  q?: string;
+  genero?: string;
+  tipo?: "pelicula" | "serie";
+  ordenar?: "anio_desc" | "anio_asc" | "titulo_asc";
+  perfil_id?: number;
+}
+
+export function buildContentSearchUrl(params: ContentSearchParams): string {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.genero) query.set("genero", params.genero);
+  if (params.tipo) query.set("tipo", params.tipo);
+  if (params.ordenar) query.set("ordenar", params.ordenar);
+  if (params.perfil_id) query.set("perfil_id", String(params.perfil_id));
+  const qs = query.toString();
+  return qs ? `/contenidos?${qs}` : "/contenidos";
+}
+
+// ─── HU6: View progress ──────────────────────────────────────────────────────
+
+export interface ReportVistaPayload {
+  contenido_id?: number;
+  episodio_id?: number;
+  segundos_vistos: number;
+  terminado?: boolean;
+}
+
+export async function reportarVista(perfilId: number, payload: ReportVistaPayload): Promise<void> {
+  await apiRequest(`/perfiles/${perfilId}/vistas`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

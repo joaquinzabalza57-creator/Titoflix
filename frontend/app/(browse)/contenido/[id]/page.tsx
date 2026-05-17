@@ -136,7 +136,9 @@ export default function ContentDetailPage() {
         : `/contenidos/${content.id}/playback`;
       const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
-      router.push(`/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(content.titulo)}`);
+      router.push(
+        `/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(content.titulo)}&contenido_id=${content.id}`
+      );
     } catch (err) {
       if (err instanceof Error && err.message.includes("403")) {
         setError("Este contenido no esta disponible para perfiles infantiles.");
@@ -167,7 +169,9 @@ export default function ContentDetailPage() {
       const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
       const title = `${content.titulo} - T${selectedTemporada.numero} E${episodio.numero}: ${episodio.titulo}`;
-      router.push(`/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(title)}`);
+      router.push(
+        `/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(title)}&episodio_id=${episodio.id}&contenido_id=${content.id}`
+      );
     } catch (err) {
       if (err instanceof Error && err.message.includes("403")) {
         setError("Este contenido no esta disponible para perfiles infantiles.");

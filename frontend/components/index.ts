@@ -9,3 +9,4 @@ export { ContentCard, ContentCardSkeleton } from "./ContentCard";
 export { ContentRow } from "./ContentRow";
 export { ContentDetail } from "./ContentDetail";
 export { VideoPlayer } from "./VideoPlayer";
+export { ContinuarViendoRow } from "./ContinuarViendoRow";

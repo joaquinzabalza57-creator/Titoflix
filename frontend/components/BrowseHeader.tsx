@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, User, X } from "lucide-react";
+import { Check, Crown, Loader2, LogOut, Menu, Plus, Search, Settings, User, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
 import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
@@ -23,6 +23,8 @@ const navItems = [
   { id: "series", label: "Series", href: "/series" },
   { id: "mi-lista", label: "Mi lista", href: "/mi-lista" },
 ];
+
+// Inline search state lives here so it works from any browse page
 
 const planLimits: Record<string, number> = {
   basico: 1,
@@ -133,6 +135,16 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
+            {/* Search button */}
+            <Link
+              href="/buscar"
+              className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-secondary ${
+                activeSection === "buscar" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label="Buscar"
+            >
+              <Search size={18} />
+            </Link>
             <div className="relative">
               <button
                 type="button"
@@ -199,6 +211,18 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
                   {item.label}
                 </Link>
               ))}
+              <Link
+                href="/buscar"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  activeSection === "buscar"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Search size={16} />
+                Buscar
+              </Link>
             </nav>
             <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
               <button
