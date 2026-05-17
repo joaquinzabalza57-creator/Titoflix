@@ -48,8 +48,8 @@ def require_admin(current_user: Cuenta = Depends(get_current_user_from_swagger))
     return current_user
 
 
-def get_owned_profile(profile_id: int, current_user: Cuenta = Depends(get_current_user_from_swagger), db: Session = Depends(get_db)) -> Perfil:
-    perfil = PerfilRepository(db).find_by_id(profile_id)
+def get_owned_profile(perfil_id: int, current_user: Cuenta = Depends(get_current_user_from_swagger), db: Session = Depends(get_db)) -> Perfil:
+    perfil = PerfilRepository(db).find_by_id(perfil_id)
     if not perfil or (perfil.cuenta_id != current_user.id and not current_user.is_admin):
         raise UnauthorizedError("Perfil no autorizado")
     return perfil

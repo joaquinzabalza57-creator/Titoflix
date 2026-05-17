@@ -17,7 +17,7 @@ echo 6. Ver consola de MinIO
 echo 7. Detener servicios
 echo 8. Reconstruir e iniciar
 echo 9. Resetear tablas de Postgres y buckets de MinIO
-echo 10. Salir
+echo 0. Salir
 echo.
 set /p option=Elegi una opcion: 
 
@@ -30,7 +30,7 @@ if "%option%"=="6" goto logs_minio
 if "%option%"=="7" goto stop
 if "%option%"=="8" goto rebuild
 if "%option%"=="9" goto reset_db
-if "%option%"=="10" goto end
+if "%option%"=="0" goto end
 goto menu
 
 :start

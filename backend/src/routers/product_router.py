@@ -1,3 +1,8 @@
+from datetime import timedelta
+import mimetypes
+import re
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -18,7 +23,7 @@ from src.dtos import (
     UpdateContenidoDTO,
     VistaResponseDTO,
 )
-from src.middlewares import get_owned_profile, require_admin
+from src.middlewares import get_current_user_from_swagger, get_owned_profile, require_admin
 from src.schemas.product_schema import (
     CreateEpisodioSchema,
     CreateTemporadaSchema,
@@ -38,23 +43,85 @@ from src.services.product_service import (
 )
 from src.dtos import UpdateEpisodioDTO, UpdateTemporadaDTO
 from src.services.storage_service import StorageService
+from src.utils import UnauthorizedError, create_access_token, decode_access_token
 
 
 router = APIRouter(tags=["products"])
 
 
-def _stream_storage_video(file_id: str, mime_type: str, request: Request) -> StreamingResponse:
+MEDIA_TOKEN_TTL_MINUTES = 10
+
+
+def _create_media_token(
+    current_user: Cuenta,
+    resource_type: str,
+    resource_id: int,
+    quality: str | None,
+    action: str,
+) -> str:
+    return create_access_token(
+        {
+            "sub": str(current_user.id),
+            "scope": "media",
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "quality": quality,
+            "action": action,
+        },
+        expires_delta=timedelta(minutes=MEDIA_TOKEN_TTL_MINUTES),
+    )
+
+
+def _verify_media_token(
+    token: str,
+    resource_type: str,
+    resource_id: int,
+    quality: str | None,
+    action: str,
+) -> None:
+    payload = decode_access_token(token)
+    if (
+        payload.get("scope") != "media"
+        or payload.get("resource_type") != resource_type
+        or payload.get("resource_id") != resource_id
+        or payload.get("quality") != quality
+        or payload.get("action") != action
+    ):
+        raise UnauthorizedError("Token de media invalido")
+
+
+def _stream_storage_video(
+    file_id: str,
+    mime_type: str,
+    request: Request,
+    filename: str | None = None,
+    as_attachment: bool = False,
+) -> StreamingResponse:
     stream = StorageService().stream_file(
         object_key=file_id,
         range_header=request.headers.get("range"),
         fallback_mime_type=mime_type,
     )
+    headers = dict(stream.headers)
+    if as_attachment and filename:
+        headers["Content-Disposition"] = _content_disposition(filename, mime_type)
+        headers["Cache-Control"] = "private, no-store"
     return StreamingResponse(
         stream.chunks,
         status_code=stream.status_code,
         media_type=mime_type,
-        headers=stream.headers,
+        headers=headers,
     )
+
+
+def _content_disposition(filename: str, mime_type: str) -> str:
+    safe_name = re.sub(r"[^a-zA-Z0-9._ -]+", "", filename).strip() or "titoflix-video"
+    safe_name = re.sub(r"\s+", "-", safe_name)
+    extension = mimetypes.guess_extension(mime_type) or ".mp4"
+    if not safe_name.lower().endswith(extension.lower()):
+        safe_name = f"{safe_name}{extension}"
+    encoded_name = quote(safe_name)
+    return f"attachment; filename=\"{safe_name}\"; filename*=UTF-8''{encoded_name}"
 
 
 def _vista_dto_from_request(
@@ -176,10 +243,20 @@ def get_contenido(contenido_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/contenidos/{contenido_id}/playback")
-def get_contenido_playback(contenido_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+def get_contenido_playback(
+    contenido_id: int,
+    quality: str | None = None,
+    current_user: Cuenta = Depends(get_current_user_from_swagger),
+    db: Session = Depends(get_db),
+):
     video = ContenidoService(db).get_video_source(contenido_id, quality)
+    token = _create_media_token(current_user, "contenido", contenido_id, quality, "stream")
     return {
-        "stream_url": f"/api/v1/contenidos/{contenido_id}/stream" + (f"?quality={quality}" if quality else ""),
+        "stream_url": (
+            f"/api/v1/contenidos/{contenido_id}/stream"
+            f"?token={quote(token)}"
+            + (f"&quality={quote(quality)}" if quality else "")
+        ),
         "mime_type": video.mime_type,
     }
 
@@ -188,11 +265,31 @@ def get_contenido_playback(contenido_id: int, quality: str | None = None, db: Se
 def stream_contenido_video(
     contenido_id: int,
     request: Request,
+    token: str,
     quality: str | None = None,
     db: Session = Depends(get_db),
 ):
+    _verify_media_token(token, "contenido", contenido_id, quality, "stream")
     video = ContenidoService(db).get_video_source(contenido_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
+
+
+@router.get("/contenidos/{contenido_id}/download")
+def download_contenido_video(
+    contenido_id: int,
+    request: Request,
+    quality: str | None = None,
+    _current_user: Cuenta = Depends(get_current_user_from_swagger),
+    db: Session = Depends(get_db),
+):
+    video = ContenidoService(db).get_video_source(contenido_id, quality)
+    return _stream_storage_video(
+        video.file_id,
+        video.mime_type,
+        request,
+        filename=video.filename,
+        as_attachment=True,
+    )
 
 
 @router.put("/contenidos/{contenido_id}", response_model=ContenidoResponseDTO)
@@ -296,10 +393,20 @@ def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/episodios/{episodio_id}/playback")
-def get_episodio_playback(episodio_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+def get_episodio_playback(
+    episodio_id: int,
+    quality: str | None = None,
+    current_user: Cuenta = Depends(get_current_user_from_swagger),
+    db: Session = Depends(get_db),
+):
     video = EpisodioService(db).get_video_source(episodio_id, quality)
+    token = _create_media_token(current_user, "episodio", episodio_id, quality, "stream")
     return {
-        "stream_url": f"/api/v1/episodios/{episodio_id}/stream" + (f"?quality={quality}" if quality else ""),
+        "stream_url": (
+            f"/api/v1/episodios/{episodio_id}/stream"
+            f"?token={quote(token)}"
+            + (f"&quality={quote(quality)}" if quality else "")
+        ),
         "mime_type": video.mime_type,
     }
 
@@ -308,11 +415,31 @@ def get_episodio_playback(episodio_id: int, quality: str | None = None, db: Sess
 def stream_episodio_video(
     episodio_id: int,
     request: Request,
+    token: str,
     quality: str | None = None,
     db: Session = Depends(get_db),
 ):
+    _verify_media_token(token, "episodio", episodio_id, quality, "stream")
     video = EpisodioService(db).get_video_source(episodio_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
+
+
+@router.get("/episodios/{episodio_id}/download")
+def download_episodio_video(
+    episodio_id: int,
+    request: Request,
+    quality: str | None = None,
+    _current_user: Cuenta = Depends(get_current_user_from_swagger),
+    db: Session = Depends(get_db),
+):
+    video = EpisodioService(db).get_video_source(episodio_id, quality)
+    return _stream_storage_video(
+        video.file_id,
+        video.mime_type,
+        request,
+        filename=video.filename,
+        as_attachment=True,
+    )
 
 
 @router.delete("/episodios/{episodio_id}", status_code=status.HTTP_204_NO_CONTENT)
