@@ -79,12 +79,7 @@ class AuthService:
             is_admin=bool(cuenta.is_admin),
         )
 
-    def auth_perfil(
-        self,
-        cuenta_id: int,
-        perfil_id: int,
-        dto: PerfilAuthDTO,
-    ) -> PerfilAuthResponseDTO:
+    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> PerfilAuthResponseDTO:
         perfil = self.perfil_repo.find_by_id(perfil_id)
 
         if not perfil or perfil.cuenta_id != cuenta_id:
@@ -96,5 +91,5 @@ class AuthService:
         return PerfilAuthResponseDTO(
             message="Perfil autorizado",
             perfil_id=perfil.id,
-            cuenta_id=cuenta_id,
+            cuenta_id=perfil.cuenta_id,
         )

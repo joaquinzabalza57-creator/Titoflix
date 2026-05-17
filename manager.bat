@@ -67,7 +67,9 @@ goto menu
 
 :rebuild
 call :write_host_ip
-docker compose up -d --build
+docker compose down --remove-orphans
+docker compose build --no-cache frontend backend
+docker compose up -d --force-recreate
 pause
 goto menu
 
@@ -85,7 +87,7 @@ goto menu
 :write_host_ip
 set "HOST_IP=127.0.0.1"
 for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"
-echo HOST_IP=%HOST_IP% > .env
+powershell -NoProfile -Command "if (Test-Path '.env') { $c=Get-Content '.env'; if ($c -match '^HOST_IP=') { $c = $c -replace '^HOST_IP=.*','HOST_IP=%HOST_IP%'; $c | Set-Content '.env' } else { Add-Content '.env' 'HOST_IP=%HOST_IP%' } } else { Set-Content '.env' 'HOST_IP=%HOST_IP%' }"
 goto :eof
 
 :end

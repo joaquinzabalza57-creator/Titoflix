@@ -169,24 +169,25 @@ def ensure_video_variant_quality_values():
 
 
 def ensure_default_admin_account():
-    """Crea o actualiza la cuenta admin fija para desarrollo."""
+    """Crea o actualiza la cuenta admin fija (ID 1) para desarrollo."""
     inspector = inspect(engine)
     if not inspector.has_table("cuentas"):
         return
 
     password_hash = hash_password(settings.ADMIN_PASSWORD)
     with engine.begin() as connection:
+        # Verificar si existe admin con ID 1
         existing = connection.execute(
-            text("SELECT id FROM cuentas WHERE email = :email"),
-            {"email": settings.ADMIN_USERNAME},
+            text("SELECT id FROM cuentas WHERE id = 1"),
         ).first()
 
         if existing:
+            # Solo actualizar contraseña si cambió
             connection.execute(
                 text(
                     "UPDATE cuentas "
-                    "SET password_hash = :password_hash, plan = :plan, is_admin = TRUE "
-                    "WHERE email = :email"
+                    "SET email = :email, password_hash = :password_hash, plan = :plan, is_admin = TRUE "
+                    "WHERE id = 1"
                 ),
                 {
                     "email": settings.ADMIN_USERNAME,
@@ -196,17 +197,42 @@ def ensure_default_admin_account():
             )
             return
 
+        # Si existe con otro ID, eliminarlo
         connection.execute(
-            text(
-                "INSERT INTO cuentas (email, password_hash, plan, is_admin) "
-                "VALUES (:email, :password_hash, :plan, TRUE)"
-            ),
-            {
-                "email": settings.ADMIN_USERNAME,
-                "password_hash": password_hash,
-                "plan": "premium",
-            },
+            text("DELETE FROM cuentas WHERE email = :email"),
+            {"email": settings.ADMIN_USERNAME},
         )
+
+        # Insertar con ID 1 explícitamente
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    "INSERT INTO cuentas (id, email, password_hash, plan, is_admin) "
+                    "VALUES (1, :email, :password_hash, :plan, TRUE)"
+                ),
+                {
+                    "email": settings.ADMIN_USERNAME,
+                    "password_hash": password_hash,
+                    "plan": "premium",
+                },
+            )
+            # Resetear el sequence para que el siguiente insert use ID 2
+            connection.execute(
+                text("SELECT setval(pg_get_serial_sequence('cuentas', 'id'), 1)")
+            )
+        else:
+            # Para SQLite y otros dialects
+            connection.execute(
+                text(
+                    "INSERT INTO cuentas (id, email, password_hash, plan, is_admin) "
+                    "VALUES (1, :email, :password_hash, :plan, TRUE)"
+                ),
+                {
+                    "email": settings.ADMIN_USERNAME,
+                    "password_hash": password_hash,
+                    "plan": "premium",
+                },
+            )
 
 
 def drop_tables():
