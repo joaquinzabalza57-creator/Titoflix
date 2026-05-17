@@ -6,16 +6,13 @@ import type { Contenido } from "@/lib/types";
 
 interface ContentCardProps {
   content: Contenido;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export function ContentCard({ content, onClick }: ContentCardProps) {
   const portadaUrl = getAssetUrl(content.portada_url);
-  return (
-    <button
-      onClick={onClick}
-      className="group flex-shrink-0 w-40 md:w-48 lg:w-56 focus:outline-none"
-    >
+  const cardContent = (
+    <>
       {/* Thumbnail */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover:border-muted-foreground transition-all duration-200">
         {portadaUrl ? (
@@ -70,7 +67,24 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
           )}
         </div>
       </div>
-    </button>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="group flex-shrink-0 w-40 md:w-48 lg:w-56 focus:outline-none"
+      >
+        {cardContent}
+      </button>
+    );
+  }
+
+  return (
+    <div className="group flex-shrink-0 w-40 md:w-48 lg:w-56">
+      {cardContent}
+    </div>
   );
 }
 

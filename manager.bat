@@ -69,6 +69,12 @@ goto menu
 call :write_host_ip
 docker compose down --remove-orphans
 docker compose build --no-cache frontend backend
+if errorlevel 1 (
+    echo.
+    echo La reconstruccion fallo. No se iniciaron los contenedores para evitar usar una imagen anterior.
+    pause
+    goto menu
+)
 docker compose up -d --force-recreate
 pause
 goto menu
