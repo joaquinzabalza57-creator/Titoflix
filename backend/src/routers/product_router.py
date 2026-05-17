@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.db import get_db
-from src.db.models import Cuenta
+from src.db.models import Cuenta, Perfil
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
@@ -18,12 +18,12 @@ from src.dtos import (
     UpdateContenidoDTO,
     VistaResponseDTO,
 )
-from src.middlewares import require_admin
+from src.middlewares import get_owned_profile, require_admin
 from src.schemas.product_schema import (
-    CreateContenidoSchema,
     CreateEpisodioSchema,
     CreateTemporadaSchema,
-    UpdateContenidoSchema,
+    UpdateEpisodioSchema,
+    UpdateTemporadaSchema,
     UpsertCalificacionSchema,
     UpsertVistaSchema,
 )
@@ -36,6 +36,7 @@ from src.services.product_service import (
     TemporadaService,
     VistaService,
 )
+from src.dtos import UpdateEpisodioDTO, UpdateTemporadaDTO
 from src.services.storage_service import StorageService
 
 
@@ -126,8 +127,8 @@ def create_contenido(
     anio: int = Form(...),
     clasificacion_edad: str = Form(...),
     descripcion: str | None = Form(default=None),
-    duracion_min: int | None = Form(default=None),
     generos_ids: list[int] = Form(...),
+    portada: UploadFile | None = File(default=None),
     video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -137,12 +138,11 @@ def create_contenido(
         tipo=tipo,
         anio=anio,
         descripcion=descripcion,
-        duracion_min=duracion_min,
         clasificacion_edad=clasificacion_edad,
         generos_ids=generos_ids,
     )
 
-    return ContenidoService(db).create_with_video(dto, video)
+    return ContenidoService(db).create_with_video(dto, video, portada)
 
 
 @router.get("/contenidos", response_model=list[ContenidoResponseDTO])
@@ -176,10 +176,10 @@ def get_contenido(contenido_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/contenidos/{contenido_id}/playback")
-def get_contenido_playback(contenido_id: int, db: Session = Depends(get_db)):
-    video = ContenidoService(db).get_video_source(contenido_id)
+def get_contenido_playback(contenido_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+    video = ContenidoService(db).get_video_source(contenido_id, quality)
     return {
-        "stream_url": f"/api/v1/contenidos/{contenido_id}/stream",
+        "stream_url": f"/api/v1/contenidos/{contenido_id}/stream" + (f"?quality={quality}" if quality else ""),
         "mime_type": video.mime_type,
     }
 
@@ -188,22 +188,35 @@ def get_contenido_playback(contenido_id: int, db: Session = Depends(get_db)):
 def stream_contenido_video(
     contenido_id: int,
     request: Request,
+    quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    video = ContenidoService(db).get_video_source(contenido_id)
+    video = ContenidoService(db).get_video_source(contenido_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
 @router.put("/contenidos/{contenido_id}", response_model=ContenidoResponseDTO)
 def update_contenido(
     contenido_id: int,
-    payload: UpdateContenidoSchema,
+    titulo: str = Form(...),
+    anio: int = Form(...),
+    clasificacion_edad: str = Form(...),
+    descripcion: str | None = Form(default=None),
+    generos_ids: list[int] = Form(...),
+    portada: UploadFile | None = File(default=None),
+    video: UploadFile | None = File(default=None),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    dto = UpdateContenidoDTO(**payload.model_dump(exclude_unset=True))
+    dto = UpdateContenidoDTO(
+        titulo=titulo,
+        anio=anio,
+        descripcion=descripcion,
+        clasificacion_edad=clasificacion_edad,
+        generos_ids=generos_ids,
+    )
 
-    return ContenidoService(db).update(contenido_id, dto)
+    return ContenidoService(db).update_with_video(contenido_id, dto, video, portada)
 
 
 @router.delete("/contenidos/{contenido_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -244,6 +257,17 @@ def delete_temporada(
     TemporadaService(db).delete(temporada_id)
 
 
+@router.put("/temporadas/{temporada_id}", response_model=TemporadaResponseDTO)
+def update_temporada(
+    temporada_id: int,
+    payload: UpdateTemporadaSchema,
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    dto = UpdateTemporadaDTO(**payload.model_dump(exclude_unset=True))
+    return TemporadaService(db).update(temporada_id, dto)
+
+
 @router.post(
     "/episodios",
     response_model=EpisodioResponseDTO,
@@ -253,7 +277,6 @@ def create_episodio(
     temporada_id: int = Form(...),
     numero: int = Form(...),
     titulo: str = Form(...),
-    duracion_min: int = Form(...),
     video: UploadFile = File(...),
     _admin: Cuenta = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -262,7 +285,6 @@ def create_episodio(
         temporada_id=temporada_id,
         numero=numero,
         titulo=titulo,
-        duracion_min=duracion_min,
     )
 
     return EpisodioService(db).create_with_video(dto, video)
@@ -274,10 +296,10 @@ def list_episodios(temporada_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/episodios/{episodio_id}/playback")
-def get_episodio_playback(episodio_id: int, db: Session = Depends(get_db)):
-    video = EpisodioService(db).get_video_source(episodio_id)
+def get_episodio_playback(episodio_id: int, quality: str | None = None, db: Session = Depends(get_db)):
+    video = EpisodioService(db).get_video_source(episodio_id, quality)
     return {
-        "stream_url": f"/api/v1/episodios/{episodio_id}/stream",
+        "stream_url": f"/api/v1/episodios/{episodio_id}/stream" + (f"?quality={quality}" if quality else ""),
         "mime_type": video.mime_type,
     }
 
@@ -286,9 +308,10 @@ def get_episodio_playback(episodio_id: int, db: Session = Depends(get_db)):
 def stream_episodio_video(
     episodio_id: int,
     request: Request,
+    quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    video = EpisodioService(db).get_video_source(episodio_id)
+    video = EpisodioService(db).get_video_source(episodio_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
 
 
@@ -301,6 +324,19 @@ def delete_episodio(
     EpisodioService(db).delete(episodio_id)
 
 
+@router.put("/episodios/{episodio_id}", response_model=EpisodioResponseDTO)
+def update_episodio(
+    episodio_id: int,
+    numero: int = Form(...),
+    titulo: str = Form(...),
+    video: UploadFile | None = File(default=None),
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    dto = UpdateEpisodioDTO(numero=numero, titulo=titulo)
+    return EpisodioService(db).update_with_video(episodio_id, dto, video)
+
+
 @router.post(
     "/perfiles/{perfil_id}/vistas",
     response_model=VistaResponseDTO,
@@ -309,10 +345,11 @@ def delete_episodio(
 def create_vista_recurso(
     perfil_id: int,
     payload: UpsertVistaSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         payload=payload,
     )
     return VistaService(db).create_or_update(dto)
@@ -325,10 +362,11 @@ def create_vista_recurso(
 def update_vista_recurso(
     perfil_id: int,
     payload: UpsertVistaSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     dto = _vista_dto_from_request(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         payload=payload,
     )
     return VistaService(db).create_or_update(dto)
@@ -342,10 +380,11 @@ def delete_vista_recurso(
     perfil_id: int,
     episodio_id: int | None = None,
     contenido_id: int | None = None,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
     VistaService(db).delete(
-        perfil_id=perfil_id,
+        perfil_id=profile.id,
         episodio_id=episodio_id,
         contenido_id=contenido_id,
     )
@@ -354,35 +393,39 @@ def delete_vista_recurso(
 @router.get("/perfiles/{perfil_id}/continuar", response_model=list[VistaResponseDTO])
 def continuar_viendo(
     perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return VistaService(db).continuar_viendo(perfil_id)
+    return VistaService(db).continuar_viendo(profile.id)
 
 
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).add(perfil_id, contenido_id)
+    return MiListaService(db).add(profile.id, contenido_id)
 
 
 @router.get("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def get_mi_lista(
     perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).list(perfil_id)
+    return MiListaService(db).list(profile.id)
 
 
 @router.delete("/perfiles/{perfil_id}/mi-lista/{contenido_id}", response_model=list[ContenidoResponseDTO])
 def remove_from_mi_lista(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).remove(perfil_id, contenido_id)
+    return MiListaService(db).remove(profile.id, contenido_id)
 
 
 @router.post(
@@ -394,9 +437,10 @@ def create_calificacion(
     perfil_id: int,
     contenido_id: int,
     payload: UpsertCalificacionSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    dto = _calificacion_dto_from_request(profile.id, contenido_id, payload)
     return CalificacionService(db).create_or_update(dto)
 
 
@@ -408,9 +452,10 @@ def update_calificacion(
     perfil_id: int,
     contenido_id: int,
     payload: UpsertCalificacionSchema,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    dto = _calificacion_dto_from_request(perfil_id, contenido_id, payload)
+    dto = _calificacion_dto_from_request(profile.id, contenido_id, payload)
     return CalificacionService(db).create_or_update(dto)
 
 
@@ -421,6 +466,7 @@ def update_calificacion(
 def delete_calificacion(
     perfil_id: int,
     contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    CalificacionService(db).delete(perfil_id, contenido_id)
+    CalificacionService(db).delete(profile.id, contenido_id)

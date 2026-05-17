@@ -1,65 +1,396 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { LoginScreen } from "@/components/LoginScreen";
+import { ProfileSelector } from "@/components/ProfileSelector";
+import { ProfileCreateScreen } from "@/components/ProfileCreateScreen";
+import { Header } from "@/components/Header";
+import { Hero } from "@/components/Hero";
+import { ContentRow } from "@/components/ContentRow";
+import { ContentDetail } from "@/components/ContentDetail";
+import { VideoPlayer } from "@/components/VideoPlayer";
+import { AdminDashboard } from "@/components/AdminDashboard";
+import { apiRequest, getSelectedProfile, getStoredAccount, isAuthenticated, logout, setStoredAccount } from "@/lib/api";
+import type { AuthAccount, Contenido, MiListaItem, ContinuarViendoItem, Profile } from "@/lib/types";
+
+type AppView = "login" | "profile-select" | "profile-create" | "home" | "player" | "admin";
+type Section = "inicio" | "peliculas" | "series" | "mi-lista";
+
+// Mock data as fallback
+const mockContenidos: Contenido[] = [
+  {
+    id: 1,
+    titulo: "Pelicula de Ejemplo",
+    descripcion: "Una emocionante pelicula llena de aventuras y momentos inolvidables.",
+    tipo: "pelicula",
+    anio: 2024,
+    clasificacion: "PG-13",
+    generos: [{ id: 1, nombre: "Accion" }, { id: 2, nombre: "Aventura" }],
+  },
+  {
+    id: 2,
+    titulo: "Serie Dramatica",
+    descripcion: "Una serie que te mantendra al borde de tu asiento con cada episodio.",
+    tipo: "serie",
+    anio: 2023,
+    clasificacion: "TV-MA",
+    generos: [{ id: 3, nombre: "Drama" }, { id: 4, nombre: "Suspenso" }],
+  },
+];
 
 export default function Home() {
+  const [view, setView] = useState<AppView>("login");
+  const [activeSection, setActiveSection] = useState<Section>("inicio");
+  const [selectedContent, setSelectedContent] = useState<Contenido | null>(null);
+  const [playerData, setPlayerData] = useState<{ url: string; title: string } | null>(null);
+  const [account, setAccount] = useState<AuthAccount | null>(null);
+
+  // Content state
+  const [allContent, setAllContent] = useState<Contenido[]>([]);
+  const [topContent, setTopContent] = useState<Contenido[]>([]);
+  const [miLista, setMiLista] = useState<Contenido[]>([]);
+  const [continuarViendo, setContinuarViendo] = useState<Contenido[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Check auth status on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      setView("login");
+      return;
+    }
+
+    const account = getStoredAccount();
+    if (account?.is_admin) {
+      setView("admin");
+      return;
+    }
+
+    apiRequest<AuthAccount>("/auth/me")
+      .then((currentAccount) => {
+        setAccount(currentAccount);
+        setStoredAccount({
+          id: currentAccount.id,
+          email: currentAccount.email,
+          is_admin: currentAccount.is_admin,
+        });
+        if (currentAccount.is_admin) {
+          setView("admin");
+          return;
+        }
+        routeAfterAccountLoad(currentAccount);
+      })
+      .catch(() => {
+        logout();
+        setView("login");
+      });
+  }, []);
+
+  const routeAfterAccountLoad = async (currentAccount: AuthAccount) => {
+    try {
+      const profiles = await apiRequest<Profile[]>(`/cuentas/${currentAccount.id}/perfiles`);
+      if (!profiles || profiles.length === 0) {
+        setView("profile-create");
+        return;
+      }
+
+      const selectedProfile = getSelectedProfile();
+      const selectedStillExists = selectedProfile && profiles.some((profile) => profile.id === selectedProfile.id);
+      setView(selectedStillExists ? "home" : "profile-select");
+    } catch {
+      setView("profile-select");
+    }
+  };
+
+  // Fetch content
+  const fetchContent = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch all content
+      const contenidos = await apiRequest<Contenido[]>("/contenidos").catch(() => []);
+      setAllContent(contenidos.length > 0 ? contenidos : mockContenidos);
+
+      // Fetch top content
+      const top = await apiRequest<Contenido[]>("/contenidos/top").catch(() => []);
+      setTopContent(top);
+
+      // Fetch Mi Lista
+      const profile = getSelectedProfile();
+      if (profile && profile.id > 0) {
+        const lista = await apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
+        const listaContenidos = lista
+          .filter((item) => item.contenido)
+          .map((item) => item.contenido as Contenido);
+        setMiLista(listaContenidos);
+
+        // Fetch Continuar Viendo
+        const continuar = await apiRequest<ContinuarViendoItem[]>(`/perfiles/${profile.id}/continuar`).catch(() => []);
+        const continuarContenidos = continuar
+          .filter((item) => item.contenido)
+          .map((item) => item.contenido as Contenido);
+        setContinuarViendo(continuarContenidos);
+      }
+    } catch (error) {
+      console.error("Error fetching content:", error);
+      setAllContent(mockContenidos);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch content when entering home
+  useEffect(() => {
+    if (view === "home") {
+      fetchContent();
+    }
+  }, [view, fetchContent]);
+
+  // Filter content by type
+  const peliculas = allContent.filter((c) => c.tipo === "pelicula");
+  const series = allContent.filter((c) => c.tipo === "serie");
+
+  // Handlers
+  const handleLoginSuccess = (options?: { admin?: boolean }) => {
+    if (options?.admin) {
+      setView("admin");
+      return;
+    }
+
+    apiRequest<AuthAccount>("/auth/me")
+      .then((currentAccount) => {
+        setAccount(currentAccount);
+        setStoredAccount({
+          id: currentAccount.id,
+          email: currentAccount.email,
+          is_admin: currentAccount.is_admin,
+        });
+        return routeAfterAccountLoad(currentAccount);
+      })
+      .catch(() => setView("profile-select"));
+  };
+
+  const handleProfileSelect = () => {
+    setView("home");
+  };
+
+  const handleNoProfiles = () => {
+    setView("profile-create");
+  };
+
+  const handleCreateProfile = () => {
+    setView("profile-create");
+  };
+
+  const handleProfileChanged = () => {
+    setSelectedContent(null);
+    setPlayerData(null);
+    fetchContent();
+  };
+
+  const handleLogout = () => {
+    setView("login");
+    setActiveSection("inicio");
+    setSelectedContent(null);
+    setPlayerData(null);
+    setAccount(null);
+  };
+
+  const handleNavigate = (section: string) => {
+    setActiveSection(section as Section);
+  };
+
+  const handleContentClick = (content: Contenido) => {
+    setSelectedContent(content);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedContent(null);
+  };
+
+  const handlePlay = (streamUrl: string, title: string) => {
+    setSelectedContent(null);
+    setPlayerData({ url: streamUrl, title });
+    setView("player");
+  };
+
+  const handleBackFromPlayer = () => {
+    setPlayerData(null);
+    setView("home");
+  };
+
+  // Render based on view
+  if (view === "login") {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (view === "profile-select") {
+    if (!account) {
+      return null;
+    }
+    return (
+      <ProfileSelector
+        accountId={account.id}
+        accountPlan={account.plan}
+        onProfileSelect={handleProfileSelect}
+        onNoProfiles={handleNoProfiles}
+        onCreateProfile={handleCreateProfile}
+      />
+    );
+  }
+
+  if (view === "profile-create") {
+    if (!account) {
+      return null;
+    }
+    return (
+      <ProfileCreateScreen
+        accountId={account.id}
+        onProfileCreated={handleProfileSelect}
+      />
+    );
+  }
+
+  if (view === "player" && playerData) {
+    return (
+      <VideoPlayer
+        streamUrl={playerData.url}
+        title={playerData.title}
+        onBack={handleBackFromPlayer}
+      />
+    );
+  }
+
+  if (view === "admin") {
+    return <AdminDashboard onLogout={handleLogout} />;
+  }
+
+  if (!account) {
+    return null;
+  }
+
+  // Home view
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <div className="min-h-screen bg-background">
+      <Header
+        activeSection={activeSection}
+        account={account}
+        onNavigate={handleNavigate}
+        onLogout={handleLogout}
+        onProfileChanged={handleProfileChanged}
+      />
+
+      <main>
+        {activeSection === "inicio" && (
+          <>
+            <Hero
+              onExplore={() => handleNavigate("peliculas")}
+              onMiLista={() => handleNavigate("mi-lista")}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+            <div className="-mt-20 relative z-10">
+              {/* Contenido Principal (Top content or all content) */}
+              <ContentRow
+                title="Contenido principal"
+                contents={topContent.length > 0 ? topContent : allContent}
+                loading={loading}
+                onContentClick={handleContentClick}
+                emptyMessage="No hay peliculas o series disponibles en este momento. Intentar mas tarde."
+              />
+
+              {/* Peliculas */}
+              <ContentRow
+                title="Peliculas"
+                contents={peliculas}
+                loading={loading}
+                onContentClick={handleContentClick}
+                emptyMessage="No hay peliculas disponibles en este momento. Intentar mas tarde."
+              />
+
+              {/* Series */}
+              <ContentRow
+                title="Series"
+                contents={series}
+                loading={loading}
+                onContentClick={handleContentClick}
+                emptyMessage="No hay series disponibles en este momento. Intentar mas tarde."
+              />
+
+              {/* Mi Lista */}
+              {miLista.length > 0 && (
+                <ContentRow
+                  title="Mi lista"
+                  contents={miLista}
+                  loading={false}
+                  onContentClick={handleContentClick}
+                />
+              )}
+
+              {/* Continuar viendo */}
+              {continuarViendo.length > 0 && (
+                <ContentRow
+                  title="Continuar viendo"
+                  contents={continuarViendo}
+                  loading={false}
+                  onContentClick={handleContentClick}
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        {activeSection === "peliculas" && (
+          <div className="pt-24 pb-12">
+            <h1 className="text-3xl font-bold text-foreground px-4 md:px-8 lg:px-16 mb-6">
+              Peliculas
+            </h1>
+            <ContentRow
+              title=""
+              contents={peliculas}
+              loading={loading}
+              onContentClick={handleContentClick}
+              emptyMessage="No hay peliculas disponibles en este momento. Intentar mas tarde."
+            />
+          </div>
+        )}
+
+        {activeSection === "series" && (
+          <div className="pt-24 pb-12">
+            <h1 className="text-3xl font-bold text-foreground px-4 md:px-8 lg:px-16 mb-6">
+              Series
+            </h1>
+            <ContentRow
+              title=""
+              contents={series}
+              loading={loading}
+              onContentClick={handleContentClick}
+              emptyMessage="No hay series disponibles en este momento. Intentar mas tarde."
+            />
+          </div>
+        )}
+
+        {activeSection === "mi-lista" && (
+          <div className="pt-24 pb-12">
+            <h1 className="text-3xl font-bold text-foreground px-4 md:px-8 lg:px-16 mb-6">
+              Mi lista
+            </h1>
+            <ContentRow
+              title=""
+              contents={miLista}
+              loading={loading}
+              onContentClick={handleContentClick}
+              emptyMessage="Tu lista esta vacia. Agrega peliculas y series para verlas mas tarde."
+            />
+          </div>
+        )}
       </main>
+
+      {/* Content Detail Modal */}
+      {selectedContent && (
+        <ContentDetail
+          content={selectedContent}
+          onClose={handleCloseDetail}
+          onPlay={handlePlay}
+        />
+      )}
     </div>
   );
 }

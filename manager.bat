@@ -16,7 +16,7 @@ echo 5. Ver consola de postgres
 echo 6. Ver consola de MinIO
 echo 7. Detener servicios
 echo 8. Reconstruir e iniciar
-echo 9. Resetear tablas de Postgres
+echo 9. Resetear tablas de Postgres y buckets de MinIO
 echo 10. Salir
 echo.
 set /p option=Elegi una opcion: 
@@ -34,6 +34,7 @@ if "%option%"=="10" goto end
 goto menu
 
 :start
+call :write_host_ip
 docker compose up -d
 pause
 goto menu
@@ -65,19 +66,29 @@ pause
 goto menu
 
 :rebuild
-docker compose up -d --build
+call :write_host_ip
+docker compose down --remove-orphans
+docker compose build --no-cache frontend backend
+docker compose up -d --force-recreate
 pause
 goto menu
 
 :reset_db
 echo.
 echo Esto elimina y vuelve a crear todas las tablas de Postgres.
-echo Los archivos cargados en MinIO no se borran.
+echo Tambien elimina y recrea el bucket titoflix-media de MinIO.
 set /p confirm=Escribi RESET para confirmar: 
 if not "%confirm%"=="RESET" goto menu
 docker compose exec backend python -c "from src.db import reset_database; reset_database()"
+docker compose run --rm --entrypoint /bin/sh minio-init -c "until mc alias set local http://minio:9000 titoflix titoflix-secret; do sleep 2; done && mc rb --force local/titoflix-media || true && mc mb --ignore-existing local/titoflix-media"
 pause
 goto menu
+
+:write_host_ip
+set "HOST_IP=127.0.0.1"
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"
+powershell -NoProfile -Command "if (Test-Path '.env') { $c=Get-Content '.env'; if ($c -match '^HOST_IP=') { $c = $c -replace '^HOST_IP=.*','HOST_IP=%HOST_IP%'; $c | Set-Content '.env' } else { Add-Content '.env' 'HOST_IP=%HOST_IP%' } } else { Set-Content '.env' 'HOST_IP=%HOST_IP%' }"
+goto :eof
 
 :end
 endlocal
