@@ -3,6 +3,7 @@ export { LoginScreen } from "./LoginScreen";
 export { ProfileSelector } from "./ProfileSelector";
 export { ProfileCreateScreen } from "./ProfileCreateScreen";
 export { Header } from "./Header";
+export { BrowseHeader } from "./BrowseHeader";
 export { Hero } from "./Hero";
 export { ContentCard, ContentCardSkeleton } from "./ContentCard";
 export { ContentRow } from "./ContentRow";

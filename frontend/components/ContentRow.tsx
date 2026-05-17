@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
 import { ContentCard, ContentCardSkeleton } from "./ContentCard";
@@ -9,7 +10,8 @@ interface ContentRowProps {
   title: string;
   contents: Contenido[];
   loading?: boolean;
-  onContentClick: (content: Contenido) => void;
+  onContentClick?: (content: Contenido) => void;
+  linkPrefix?: string;
   emptyMessage?: string;
 }
 
@@ -18,6 +20,7 @@ export function ContentRow({
   contents,
   loading = false,
   onContentClick,
+  linkPrefix,
   emptyMessage = "No hay contenido disponible en este momento.",
 }: ContentRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -75,11 +78,17 @@ export function ContentRow({
           ) : contents.length > 0 ? (
             // Content cards
             contents.map((content) => (
-              <ContentCard
-                key={content.id}
-                content={content}
-                onClick={() => onContentClick(content)}
-              />
+              linkPrefix ? (
+                <Link key={content.id} href={`${linkPrefix}/${content.id}`}>
+                  <ContentCard content={content} />
+                </Link>
+              ) : (
+                <ContentCard
+                  key={content.id}
+                  content={content}
+                  onClick={() => onContentClick?.(content)}
+                />
+              )
             ))
           ) : (
             // Empty state
