@@ -5,7 +5,7 @@ import { Hero } from "@/components/Hero";
 import { ContentRow } from "@/components/ContentRow";
 import { ContinuarViendoRow } from "@/components/ContinuarViendoRow";
 import { apiRequest, getSelectedProfile } from "@/lib/api";
-import type { Contenido, MiListaItem, ContinuarViendoItem } from "@/lib/types";
+import type { Contenido, ContinuarViendoItem } from "@/lib/types";
 
 const mockContenidos: Contenido[] = [
   {
@@ -47,14 +47,14 @@ export default function InicioPage() {
       const profile = getSelectedProfile();
       if (profile && profile.id > 0) {
         // HU8: mi lista
-        const lista = await apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
-        setMiLista(lista.filter((item) => item.contenido).map((item) => item.contenido as Contenido));
+        const lista = await apiRequest<Contenido[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
+        setMiLista(lista);
 
         // HU7: continuar viendo — returns up to 10 unfinished items, ordered by last watched
         const continuar = await apiRequest<ContinuarViendoItem[]>(
           `/perfiles/${profile.id}/continuar`
         ).catch(() => []);
-        setContinuarViendo(continuar);
+        setContinuarViendo(continuar.filter((item) => item.contenido));
       }
     } catch (error) {
       console.error("Error fetching content:", error);

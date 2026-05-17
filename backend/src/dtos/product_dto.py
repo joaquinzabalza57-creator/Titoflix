@@ -153,6 +153,16 @@ class VistaResponseDTO(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ContinuarViendoDTO(BaseModel):
+    contenido: ContenidoResponseDTO
+    episodio: EpisodioResponseDTO | None = None
+    temporada: TemporadaResponseDTO | None = None
+    segundos_vistos: int
+    duracion_total: int
+    terminado: bool
+    actualizado_en: datetime | None = None
+
+
 class CreateCalificacionDTO(BaseModel):
     perfil_id: int
     contenido_id: int

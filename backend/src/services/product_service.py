@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from src.dtos import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
+    ContinuarViendoDTO,
     CreateCalificacionDTO,
     CreateContenidoDTO,
     CreateEpisodioDTO,
@@ -692,10 +693,34 @@ class VistaService:
         if not deleted:
             raise NotFoundError("Vista no encontrada")
 
-    def continuar_viendo(self, perfil_id: int) -> list[VistaResponseDTO]:
+    def continuar_viendo(self, perfil_id: int) -> list[ContinuarViendoDTO]:
         if not self.perfil_repo.find_by_id(perfil_id):
             raise NotFoundError("Perfil no encontrado")
-        return to_vista_response_list(self.vista_repo.continuar_viendo(perfil_id)[:10])
+        items: list[ContinuarViendoDTO] = []
+        for vista in self.vista_repo.continuar_viendo(perfil_id)[:10]:
+            contenido = vista.contenido
+            episodio = vista.episodio
+            temporada = episodio.temporada if episodio else None
+            if episodio and temporada:
+                contenido = temporada.contenido
+                duracion_total = int((episodio.duracion_min or 0) * 60)
+            elif contenido:
+                duracion_total = int((contenido.duracion_min or 0) * 60)
+            else:
+                continue
+
+            items.append(
+                ContinuarViendoDTO(
+                    contenido=to_contenido_response(contenido),
+                    episodio=to_episodio_response(episodio) if episodio else None,
+                    temporada=to_temporada_response(temporada) if temporada else None,
+                    segundos_vistos=vista.segundos_vistos,
+                    duracion_total=duracion_total,
+                    terminado=bool(vista.terminado),
+                    actualizado_en=vista.fecha,
+                )
+            )
+        return items
 
 
 class MiListaService:

@@ -12,6 +12,7 @@ from src.db.models import Cuenta, Perfil
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
+    ContinuarViendoDTO,
     CreateEpisodioDTO,
     CreateTemporadaDTO,
     CreateVistaDTO,
@@ -29,6 +30,7 @@ from src.schemas.product_schema import (
     CreateTemporadaSchema,
     UpdateEpisodioSchema,
     UpdateTemporadaSchema,
+    MiListaSchema,
     UpsertCalificacionSchema,
     UpsertVistaSchema,
 )
@@ -517,7 +519,7 @@ def delete_vista_recurso(
     )
 
 
-@router.get("/perfiles/{perfil_id}/continuar", response_model=list[VistaResponseDTO])
+@router.get("/perfiles/{perfil_id}/continuar", response_model=list[ContinuarViendoDTO])
 def continuar_viendo(
     perfil_id: int,
     profile: Perfil = Depends(get_owned_profile),
@@ -529,11 +531,11 @@ def continuar_viendo(
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,
-    contenido_id: int,
+    payload: MiListaSchema,
     profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    return MiListaService(db).add(profile.id, contenido_id)
+    return MiListaService(db).add(profile.id, payload.contenido_id)
 
 
 @router.get("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])

@@ -84,7 +84,6 @@ CreateCalificacionSchema = UpsertCalificacionSchema
 
 
 class MiListaSchema(BaseModel):
-    perfil_id: int
     contenido_id: int
 
 

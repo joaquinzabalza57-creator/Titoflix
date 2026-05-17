@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { X, Film, Tv, List, Loader2 } from "lucide-react";
 import { apiRequest, getSelectedProfile, getAssetUrl } from "@/lib/api";
-import type { Contenido, MiListaItem } from "@/lib/types";
+import type { Contenido } from "@/lib/types";
 
 export default function MiListaPage() {
   const [miLista, setMiLista] = useState<Contenido[]>([]);
@@ -20,8 +20,8 @@ export default function MiListaPage() {
     }
     try {
       // HU8: GET /perfiles/{id}/mi-lista — respects infantil restriction via perfil_id on the backend
-      const lista = await apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`);
-      setMiLista(lista.filter((item) => item.contenido).map((item) => item.contenido as Contenido));
+      const lista = await apiRequest<Contenido[]>(`/perfiles/${profile.id}/mi-lista`);
+      setMiLista(lista);
     } catch {
       setMiLista([]);
     } finally {
