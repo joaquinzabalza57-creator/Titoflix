@@ -19,10 +19,15 @@ allowed_origins = [
     for origin in settings.CORS_ORIGINS.split(",")
     if origin.strip()
 ]
+host_ip_origin = f"http://{settings.HOST_IP}:3000"
+if settings.HOST_IP and host_ip_origin not in allowed_origins:
+    allowed_origins.append(host_ip_origin)
+allow_origin_regex = r"https?://.*" if settings.ENVIRONMENT == "development" else None
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -17,7 +17,9 @@ URLs principales:
 - Swagger: `http://localhost:8000/docs`
 - MinIO Console: `http://localhost:9001`
 
-El frontend llama al backend directamente en `http://localhost:8000/api/v1` desde el navegador.
+El frontend usa `/api/v1` desde el navegador y Next.js lo reenvia al backend dentro de Docker. Eso permite abrir la app desde otra computadora usando el host publico, por ejemplo `http://TU-DOMINIO:3000`, sin que el navegador intente llamar a su propio `localhost`.
+
+Para usarla fuera de la LAN tenes que publicar el puerto `3000` del equipo que corre Docker mediante port forwarding, un dominio/reverse proxy, una VPS, o un tunel como Cloudflare Tunnel/ngrok. No hace falta exponer el puerto `8000` si se usa el frontend, porque las llamadas pasan por `/api/v1`.
 
 Tambien podes usar:
 

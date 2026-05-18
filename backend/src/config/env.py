@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     HOST: str = "127.0.0.1"                  # Host local donde escucha Uvicorn
     PORT: int = 8000                         # Puerto donde corre la app
+    HOST_IP: str = "127.0.0.1"               # IP local usada por Docker Manager para acceder desde la red
 
     JWT_SECRET: str = "cambiame-en-produccion"   # Clave secreta para firmar tokens JWT
     JWT_ALGORITHM: str = "HS256"                # Algoritmo de encriptación para JWT

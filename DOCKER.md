@@ -58,7 +58,9 @@ La opcion `Resetear tablas de Postgres y buckets de MinIO` de `manager.bat` tamb
 - MinIO API S3: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
 
-El frontend llama al backend directamente en `http://localhost:8000/api/v1/...` desde el navegador. Swagger esta disponible en `http://localhost:8000/docs`.
+El frontend llama a `/api/v1/...` desde el navegador. Next.js reenvia esas requests al backend interno `http://backend:8000`, asi que la app tambien puede abrirse desde una computadora externa usando el host publico del frontend, por ejemplo `http://TU-DOMINIO:3000`.
+
+Para acceso fuera de la LAN, publica el puerto `3000` del equipo que corre Docker con port forwarding, un dominio/reverse proxy, una VPS, o un tunel como Cloudflare Tunnel/ngrok. No hace falta exponer `8000` para el uso normal del frontend.
 
 Credenciales de MinIO:
 
@@ -79,8 +81,10 @@ S3_SECRET_KEY=titoflix-secret
 S3_BUCKET_NAME=titoflix-media
 S3_REGION=us-east-1
 S3_MEDIA_PREFIX=media
-INTERNAL_BACKEND_URL=http://localhost:8000
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+INTERNAL_BACKEND_URL=http://backend:8000
+NEXT_PUBLIC_API_URL=/api/v1
+NEXT_PUBLIC_DIRECT_API_URL=/api/v1
+NEXT_PUBLIC_BACKEND_URL=
 ```
 
 El backend crea las tablas al arrancar. PostgreSQL guarda datos en el volumen `postgres_data` y MinIO guarda archivos en `minio_data`.
