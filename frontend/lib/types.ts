@@ -1,4 +1,5 @@
-// Types for the TITOFLIX streaming app
+// Tipos compartidos por componentes. Deben mantenerse alineados con los DTOs
+// de backend/src/dtos para que el contrato frontend/backend sea explicito.
 
 export interface User {
   id: number;
@@ -29,6 +30,7 @@ export interface Genero {
 }
 
 export interface VideoVariant {
+  // Variante generada por FFmpeg y seleccionable en los reproductores.
   id: number;
   quality: "FHD" | "QHD" | "4K";
   video_storage_key: string;
@@ -88,6 +90,7 @@ export interface Episodio {
 }
 
 export interface PlaybackResponse {
+  // /playback devuelve una URL temporal que luego se usa como src del <video>.
   stream_url: string;
 }
 
@@ -118,6 +121,7 @@ export interface Vista {
 }
 
 export interface ContinuarViendoItem {
+  // Respuesta enriquecida para la fila "Continuar viendo".
   contenido: Contenido;
   episodio?: Episodio | null;
   temporada?: Temporada | null;

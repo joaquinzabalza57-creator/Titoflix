@@ -5,6 +5,8 @@ from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, VideoVa
 
 
 class GeneroRepository:
+    """Acceso a datos de generos sin reglas de negocio."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -35,6 +37,8 @@ class GeneroRepository:
 
 
 class ContenidoRepository:
+    """Consultas y persistencia del catalogo principal."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -90,6 +94,7 @@ class ContenidoRepository:
         clasificacion_edad: str | None = None,
         ordenar: str | None = None,
     ) -> list[Contenido]:
+        """Arma filtros combinables usados por busqueda, filas y selector admin."""
         query = self.db.query(Contenido)
         needs_distinct = False
 
@@ -120,6 +125,7 @@ class ContenidoRepository:
         return query.all()
 
     def top(self, limit: int = 10, genero: str | None = None) -> list[Contenido]:
+        """Ordena por vistas terminadas, sumando peliculas y episodios de series."""
         vista_contenido = aliased(Vista)
         vista_episodio = aliased(Vista)
         total_vistas = (
@@ -176,6 +182,8 @@ class ContenidoRepository:
 
 
 class VideoVariantRepository:
+    """Persistencia de variantes generadas por FFmpeg."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -279,6 +287,8 @@ class VideoVariantRepository:
 
 
 class TemporadaRepository:
+    """CRUD directo para temporadas."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -334,6 +344,8 @@ class TemporadaRepository:
 
 
 class EpisodioRepository:
+    """CRUD directo para episodios."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -399,6 +411,8 @@ class EpisodioRepository:
 
 
 class VistaRepository:
+    """Upsert y lectura de progreso por perfil."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -499,6 +513,8 @@ class VistaRepository:
 
 
 class CalificacionRepository:
+    """Persistencia de puntajes por perfil y contenido."""
+
     def __init__(self, db: Session):
         self.db = db
 

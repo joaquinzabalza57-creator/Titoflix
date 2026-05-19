@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { reportarVista } from "@/lib/api";
 
-// Report progress every N seconds of playback time
+// Reporta progreso cada N segundos de reproduccion.
 const REPORT_INTERVAL_SECONDS = 5;
-// Threshold to mark as terminado (90%)
+// Umbral acordado con backend para marcar terminado.
 const TERMINADO_THRESHOLD = 0.9;
 
 export default function ReproducirPage() {
@@ -20,6 +20,7 @@ export default function ReproducirPage() {
 }
 
 function ReproducirContent() {
+  // Reproductor dedicado: valida sesion/perfil y sincroniza progreso con backend.
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, profile, account } = useAuth();
@@ -54,7 +55,7 @@ function ReproducirContent() {
     }
   }, [isAuthenticated, isLoading, account, profile, router]);
 
-  // HU6: report progress via POST /perfiles/{id}/vistas
+  // HU6: reporta progreso via POST /perfiles/{id}/vistas.
   const reportProgress = useCallback(
     async (segundos: number, terminado: boolean) => {
       if (!profile?.id) return;
@@ -77,7 +78,7 @@ function ReproducirContent() {
         }
         await reportarVista(profile.id, payload);
       } catch {
-        // Silently ignore progress report errors — they shouldn't interrupt playback
+        // Los errores de progreso no deben interrumpir la reproduccion.
       }
     },
     [profile, contenidoId, episodioId]
@@ -91,7 +92,7 @@ function ReproducirContent() {
     const duration = video.duration;
     const progress = current / duration;
 
-    // Mark terminado once at 90%+
+    // Marca terminado una sola vez al superar el umbral.
     if (progress >= TERMINADO_THRESHOLD && !reportedTerminadoRef.current) {
       reportedTerminadoRef.current = true;
       reportProgress(current, true);
@@ -99,14 +100,14 @@ function ReproducirContent() {
       return;
     }
 
-    // Report every REPORT_INTERVAL_SECONDS
+    // Reporte periodico para alimentar Continuar viendo.
     if (current - lastReportedRef.current >= REPORT_INTERVAL_SECONDS) {
       lastReportedRef.current = current;
       reportProgress(current, false);
     }
   }, [reportProgress]);
 
-  // Report final position on pause / before unload
+  // Reporte final en pausa o cierre de pestana.
   const handlePause = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -118,7 +119,7 @@ function ReproducirContent() {
     const handleBeforeUnload = () => {
       const video = videoRef.current;
       if (!video) return;
-      // Best-effort sync report on tab close
+      // Best-effort al cerrar la pestana.
       reportProgress(video.currentTime, false);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -126,7 +127,7 @@ function ReproducirContent() {
   }, [reportProgress]);
 
   const handleBack = () => {
-    // Report current position before navigating away
+    // Guarda posicion antes de volver.
     const video = videoRef.current;
     if (video) reportProgress(video.currentTime, false);
     router.back();
@@ -157,7 +158,6 @@ function ReproducirContent() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header overlay */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black to-transparent">
         <div className="flex items-center gap-4">
           <button
@@ -171,7 +171,6 @@ function ReproducirContent() {
         </div>
       </div>
 
-      {/* Video element */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"

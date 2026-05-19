@@ -1,11 +1,15 @@
-from passlib.context import CryptContext                         # Importa el contexto de criptografía
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Configura bcrypt como algoritmo de hashing
+from passlib.context import CryptContext
 
 
-def hash_password(plain: str) -> str:                            # Genera un hash a partir de texto plano
-    return pwd_context.hash(plain)                               # Retorna la contraseña cifrada
+# Bcrypt limita passwords a 72 bytes; los schemas aplican ese maximo antes.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def verify_password(plain: str, hashed: str) -> bool:            # Verifica si la contraseña coincide con el hash
-    return pwd_context.verify(plain, hashed)                     # Retorna True si la validación es exitosa
+def hash_password(plain: str) -> str:
+    """Genera un hash seguro para passwords y PINs."""
+    return pwd_context.hash(plain)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    """Compara texto plano con un hash almacenado."""
+    return pwd_context.verify(plain, hashed)

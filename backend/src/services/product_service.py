@@ -48,12 +48,15 @@ from src.utils import ConflictError, ForbiddenError, NotFoundError
 
 
 class VideoSourceDTO(BaseModel):
+    """Contrato interno para entregar al router el objeto de video elegido."""
+
     file_id: str
     mime_type: str
     filename: str
 
 
 def _variant_uploads_to_payload(variants) -> dict[str, dict]:
+    """Convierte uploads de storage al formato que persiste VideoVariantRepository."""
     return {
         quality: {
             "video_storage_key": upload.object_key,
@@ -65,12 +68,15 @@ def _variant_uploads_to_payload(variants) -> dict[str, dict]:
 
 
 def _processing_warning(source_quality: str, message: str | None) -> VideoProcessingWarningDTO | None:
+    """Adjunta advertencias de transcodificacion para que el admin las vea."""
     if not message:
         return None
     return VideoProcessingWarningDTO(message=message, source_quality=source_quality)
 
 
 class GeneroService:
+    """Reglas de negocio para generos del catalogo."""
+
     def __init__(self, db: Session):
         self.genero_repo = GeneroRepository(db)
 
@@ -94,6 +100,8 @@ class GeneroService:
 
 
 class ContenidoService:
+    """Reglas de catalogo, carga de videos, portadas y busqueda de contenido."""
+
     def __init__(self, db: Session):
         self.contenido_repo = ContenidoRepository(db)
         self.genero_repo = GeneroRepository(db)
@@ -109,6 +117,7 @@ class ContenidoService:
         video_file: UploadFile | None,
         portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
+        """Crea peliculas/series y, si corresponde, procesa video y portada."""
         self._validate_content_payload(
             tipo=dto.tipo,
             duracion_min=dto.duracion_min,
@@ -170,6 +179,7 @@ class ContenidoService:
         return to_contenido_response(contenido)
 
     def search(self, q=None, tipo=None, genero_id=None, genero=None, perfil_id=None, ordenar=None):
+        """Busca catalogo aplicando filtro infantil cuando llega un perfil."""
         clasificacion_edad = None
         if perfil_id is not None:
             perfil = self.perfil_repo.find_by_id(perfil_id)
@@ -198,6 +208,7 @@ class ContenidoService:
         video_file: UploadFile | None,
         portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
+        """Actualiza metadata y reemplaza video/portada sin cambiar el tipo de contenido."""
         contenido_actual = self.contenido_repo.find_by_id(contenido_id)
         if not contenido_actual:
             raise NotFoundError("Contenido no encontrado")
@@ -253,6 +264,7 @@ class ContenidoService:
         return response
 
     def delete(self, contenido_id: int) -> None:
+        """Borra contenido y todos sus objetos asociados en storage."""
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:
             raise NotFoundError("Contenido no encontrado")
@@ -279,6 +291,7 @@ class ContenidoService:
         return to_contenido_response_list(contenidos)
 
     def get_video_source(self, contenido_id: int, quality: str | None = None) -> VideoSourceDTO:
+        """Elige la variante pedida o la mejor disponible para reproducir."""
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:
             raise NotFoundError("Contenido no encontrado")
@@ -349,6 +362,8 @@ class ContenidoService:
 
 
 class TemporadaService:
+    """Reglas para temporadas pertenecientes a contenidos tipo serie."""
+
     def __init__(self, db: Session):
         self.contenido_repo = ContenidoRepository(db)
         self.temporada_repo = TemporadaRepository(db)
@@ -411,6 +426,8 @@ class TemporadaService:
 
 
 class EpisodioService:
+    """Reglas para episodios, videos transcodificados y miniaturas."""
+
     def __init__(self, db: Session):
         self.temporada_repo = TemporadaRepository(db)
         self.episodio_repo = EpisodioRepository(db)
@@ -424,6 +441,7 @@ class EpisodioService:
         dto: CreateEpisodioDTO,
         video_file: UploadFile | None,
     ) -> EpisodioResponseDTO:
+        """Crea episodio, procesa su video y guarda miniatura generada."""
         temporada = self.temporada_repo.find_by_id(dto.temporada_id)
         if not temporada:
             raise NotFoundError("Temporada no encontrada")
@@ -497,6 +515,7 @@ class EpisodioService:
         dto: UpdateEpisodioDTO,
         video_file: UploadFile | None,
     ) -> EpisodioResponseDTO:
+        """Actualiza datos y opcionalmente reemplaza el video completo del episodio."""
         fields = dto.model_dump(exclude_unset=True, exclude_none=True)
         fields.pop("duracion_min", None)
         episodio = self.episodio_repo.find_by_id(episodio_id)
@@ -613,6 +632,8 @@ class EpisodioService:
 
 
 class VistaService:
+    """Progreso de reproduccion, continuar viendo y restricciones infantiles."""
+
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)
@@ -626,6 +647,7 @@ class VistaService:
         return self.create_or_update(dto)
 
     def create_or_update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
+        """Upsert de progreso; marca terminado automaticamente al superar 90%."""
         perfil = self.perfil_repo.find_by_id(dto.perfil_id)
         if not perfil:
             raise NotFoundError("Perfil no encontrado")
@@ -724,6 +746,8 @@ class VistaService:
 
 
 class MiListaService:
+    """Administracion de la lista personal de cada perfil."""
+
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)
@@ -758,6 +782,8 @@ class MiListaService:
 
 
 class CalificacionService:
+    """Calificaciones, permitidas solo cuando el perfil ya empezo el contenido."""
+
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)

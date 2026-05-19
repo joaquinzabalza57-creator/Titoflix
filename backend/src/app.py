@@ -12,8 +12,12 @@ from src.utils.errors import AppError
 
 API_PREFIX = "/api/v1"
 
+# Punto central de armado de FastAPI: aca se registran middlewares, routers y
+# tareas de arranque que necesitan correr antes de aceptar requests.
 app = FastAPI(title="Titoflix API", version="1.0.0", redirect_slashes=False)
 
+# Origenes permitidos para el frontend. En desarrollo se suma HOST_IP para que
+# una app abierta desde otro equipo de la red pueda consumir este backend.
 allowed_origins = [
     origin.strip()
     for origin in settings.CORS_ORIGINS.split(",")
@@ -35,6 +39,8 @@ app.add_middleware(
 
 app.add_exception_handler(AppError, app_error_handler)
 
+# Todas las rutas funcionales viven bajo /api/v1 para que el frontend pueda
+# cambiar de version sin mezclar endpoints antiguos y nuevos.
 app.include_router(auth_router.router, prefix=API_PREFIX)
 app.include_router(asset_router.router, prefix=API_PREFIX)
 app.include_router(user_router.router, prefix=API_PREFIX)
@@ -43,6 +49,7 @@ app.include_router(product_router.router, prefix=API_PREFIX)
 
 @app.on_event("startup")
 def startup():
+    """Prepara la base de datos al iniciar, esperando a Postgres si Docker aun levanta."""
     for attempt in range(1, 11):
         try:
             create_tables()
@@ -55,4 +62,5 @@ def startup():
 
 @app.get("/health")
 def health():
+    """Endpoint liviano para checks de Docker, proxies o monitoreo local."""
     return {"status": "ok"}

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
 
+# Schemas publicos de auth: validan credenciales y describen el token devuelto.
 class LoginSchema(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)

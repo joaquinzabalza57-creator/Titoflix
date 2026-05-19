@@ -31,7 +31,7 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: Cuenta | None = Depends(get_optional_current_user_from_swagger),
 ):
-    """Crear una nueva cuenta de usuario."""
+    """Crear una cuenta; solo admins pueden crear otras cuentas admin."""
     dto = CreateCuentaDTO(**payload.model_dump())
 
     if dto.is_admin and (not current_user or not current_user.is_admin):
@@ -53,7 +53,7 @@ def create_profile(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Crear un nuevo perfil."""
+    """Crear un perfil dentro de la cuenta actual, respetando limites del plan."""
     payload_data = payload.model_dump()
     requested_account_id = payload_data.pop("cuenta_id", None)
 
@@ -70,7 +70,7 @@ def list_profiles_by_user(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Listar todos los perfiles de una cuenta."""
+    """Listar perfiles para que el frontend muestre el selector post-login."""
     if current_user.id != user_id and not current_user.is_admin:
         raise ForbiddenError("No autorizado para ver estos perfiles")
     return PerfilService(db).list_by_cuenta(user_id)
@@ -82,7 +82,7 @@ def get_profile(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Obtener los datos de un perfil por ID."""
+    """Obtener un perfil validando propiedad de cuenta."""
     perfil = PerfilService(db).get_by_id(profile_id)
     if current_user.id != perfil.cuenta_id and not current_user.is_admin:
         raise ForbiddenError("No autorizado para ver este perfil")
@@ -96,7 +96,7 @@ def update_profile(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Actualizar un perfil."""
+    """Actualizar nombre, PIN, avatar o flag infantil de un perfil."""
     perfil = PerfilService(db).get_by_id(profile_id)
     if current_user.id != perfil.cuenta_id and not current_user.is_admin:
         raise ForbiddenError("No autorizado para actualizar este perfil")
@@ -123,7 +123,7 @@ def get_user(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Obtener los datos de una cuenta específica por ID."""
+    """Obtener los datos de una cuenta por ID."""
     if current_user.id != user_id and not current_user.is_admin:
         raise ForbiddenError("No autorizado para ver esta cuenta")
     return CuentaService(db).get_by_id(user_id)

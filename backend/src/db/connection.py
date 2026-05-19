@@ -22,6 +22,7 @@ def get_db():
 def create_tables():
     """Crea todas las tablas en la BD y agrega columnas nuevas en bases existentes."""
     Base.metadata.create_all(bind=engine)
+    # Migraciones livianas para bases locales antiguas sin incorporar Alembic.
     ensure_account_admin_column()
     ensure_storage_media_columns()
     ensure_asset_media_columns()
@@ -176,13 +177,13 @@ def ensure_default_admin_account():
 
     password_hash = hash_password(settings.ADMIN_PASSWORD)
     with engine.begin() as connection:
-        # Verificar si existe admin con ID 1
+        # El frontend/admin y la documentacion asumen una cuenta admin estable.
         existing = connection.execute(
             text("SELECT id FROM cuentas WHERE id = 1"),
         ).first()
 
         if existing:
-            # Solo actualizar contraseña si cambió
+            # Si ya existe, se sincronizan credenciales y permisos desde `.env`.
             connection.execute(
                 text(
                     "UPDATE cuentas "
@@ -197,13 +198,13 @@ def ensure_default_admin_account():
             )
             return
 
-        # Si existe con otro ID, eliminarlo
+        # Si existe con otro ID, se elimina para evitar duplicados del admin fijo.
         connection.execute(
             text("DELETE FROM cuentas WHERE email = :email"),
             {"email": settings.ADMIN_USERNAME},
         )
 
-        # Insertar con ID 1 explícitamente
+        # Insertar con ID 1 explicitamente.
         if engine.dialect.name == "postgresql":
             connection.execute(
                 text(
@@ -216,12 +217,12 @@ def ensure_default_admin_account():
                     "plan": "premium",
                 },
             )
-            # Resetear el sequence para que el siguiente insert use ID 2
+            # Resetear el sequence para que el siguiente insert use ID 2.
             connection.execute(
                 text("SELECT setval(pg_get_serial_sequence('cuentas', 'id'), 1)")
             )
         else:
-            # Para SQLite y otros dialects
+            # Para SQLite y otros dialects.
             connection.execute(
                 text(
                     "INSERT INTO cuentas (id, email, password_hash, plan, is_admin) "
