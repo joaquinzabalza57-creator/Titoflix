@@ -17,6 +17,9 @@ echo 6. Ver consola de MinIO
 echo 7. Detener servicios
 echo 8. Reconstruir e iniciar
 echo 9. Resetear tablas de Postgres y buckets de MinIO
+echo 10. Iniciar tunel publico
+echo 11. Ver URL del tunel publico
+echo 12. Detener tunel publico
 echo 0. Salir
 echo.
 set /p option=Elegi una opcion: 
@@ -30,6 +33,9 @@ if "%option%"=="6" goto logs_minio
 if "%option%"=="7" goto stop
 if "%option%"=="8" goto rebuild
 if "%option%"=="9" goto reset_db
+if "%option%"=="10" goto start_tunnel
+if "%option%"=="11" goto tunnel_logs
+if "%option%"=="12" goto stop_tunnel
 if "%option%"=="0" goto end
 goto menu
 
@@ -119,6 +125,12 @@ if errorlevel 1 (
 )
 docker compose down --remove-orphans
 docker compose build --no-cache frontend backend
+if errorlevel 1 (
+    echo.
+    echo La reconstruccion fallo. No se iniciaron los contenedores para evitar usar una imagen anterior.
+    pause
+    goto menu
+)
 docker compose up -d --force-recreate
 pause
 goto menu
@@ -144,6 +156,7 @@ docker compose run --rm --entrypoint /bin/sh minio-init -c "until mc alias set l
 pause
 goto menu
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
 :start_tunnel
@@ -152,6 +165,9 @@ if errorlevel 1 (
     pause
     goto menu
 )
+=======
+:start_tunnel
+>>>>>>> parent of cf3697a (feat: implement HU9, HU10, and HU11)
 docker rm -f titoflix-cloudflared-tunnel >nul 2>nul
 docker run -d --name titoflix-cloudflared-tunnel cloudflare/cloudflared:latest tunnel --url http://host.docker.internal:3000
 echo.
@@ -162,25 +178,32 @@ pause
 goto menu
 
 :tunnel_logs
+<<<<<<< HEAD
 call :check_docker
 if errorlevel 1 (
     pause
     goto menu
 )
+=======
+>>>>>>> parent of cf3697a (feat: implement HU9, HU10, and HU11)
 docker logs titoflix-cloudflared-tunnel
 pause
 goto menu
 
 :stop_tunnel
+<<<<<<< HEAD
 call :check_docker
 if errorlevel 1 (
     pause
     goto menu
 )
+=======
+>>>>>>> parent of cf3697a (feat: implement HU9, HU10, and HU11)
 docker rm -f titoflix-cloudflared-tunnel
 pause
 goto menu
 
+<<<<<<< HEAD
 :ensure_env
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (!(Test-Path '.env') -or -not (Select-String -Path '.env' -Pattern '^DATABASE_URL=' -Quiet)) { if (Test-Path '.env.example') { Copy-Item '.env.example' '.env' -Force; Write-Host 'Se creo/actualizo .env desde .env.example porque faltaban variables base.' } else { Write-Error 'No se encontro .env.example para crear .env.'; exit 1 } }"
 goto :eof
@@ -197,6 +220,8 @@ if errorlevel 1 (
 goto :eof
 
 >>>>>>> Stashed changes
+=======
+>>>>>>> parent of cf3697a (feat: implement HU9, HU10, and HU11)
 :write_host_ip
 set "HOST_IP=127.0.0.1"
 for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"

@@ -24,6 +24,9 @@ type TestPlayback = PlaybackResource & {
 };
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
+  // Consola administrativa: consume endpoints protegidos de generos, contenidos,
+  // temporadas, episodios y playback de prueba. La mayor parte de integracion
+  // backend/frontend para carga de catalogo vive aca.
   const [contenidos, setContenidos] = useState<Contenido[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
   const [temporadas, setTemporadas] = useState<Temporada[]>([]);
@@ -74,6 +77,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const series = contenidos.filter((contenido) => contenido.tipo === "serie");
 
   const loadBaseData = async () => {
+    // Carga los datos base que alimentan formularios, listas y selectores.
     setLoading(true);
     try {
       const [contentData, generoData] = await Promise.all([
@@ -207,6 +211,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const handleContenidoSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    // Crea peliculas/series con FormData para poder enviar video y portada juntos.
     event.preventDefault();
     setContenidoFormMessage(null);
     const formElement = event.currentTarget;
@@ -300,6 +305,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const handleEpisodioSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    // Los episodios siempre suben video; el backend calcula duracion y miniatura.
     event.preventDefault();
     setEpisodioFormMessage(null);
     const formElement = event.currentTarget;
@@ -350,6 +356,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const playbackPath = (resource: PlaybackResource, quality: string) => {
+    // Contrato con product_router: se pide una URL temporal por recurso/calidad.
     const basePath =
       resource.type === "contenido"
         ? `/contenidos/${resource.id}/playback`
@@ -363,6 +370,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       .map((variant) => variant.quality);
 
   const openPlayback = async (contenido: Contenido, quality?: string) => {
+    // Prueba de reproduccion para peliculas recien cargadas desde la consola.
     const qualities = qualityOptions(contenido.video_variants);
     const selectedQuality = quality || qualities[0] || "";
     const resource: PlaybackResource = {
@@ -385,6 +393,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const openEpisodePlayback = async (episodio: Episodio, quality?: string) => {
+    // Prueba de reproduccion para episodios recien cargados desde la consola.
     const qualities = qualityOptions(episodio.video_variants);
     const selectedQuality = quality || qualities[0] || "";
     const resource: PlaybackResource = {
@@ -422,6 +431,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const handleContenidoUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
+    // Actualiza metadata y opcionalmente reemplaza video/portada de peliculas.
     event.preventDefault();
     if (!selectedUpdateContenido) {
       setMessage({ type: "error", text: "Elegí un contenido para modificar." });
@@ -487,6 +497,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   const handleEpisodioUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
+    // Reemplazar video regenera variantes y miniatura en backend.
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {

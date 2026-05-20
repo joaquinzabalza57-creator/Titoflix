@@ -6,18 +6,15 @@ import type { Contenido } from "@/lib/types";
 
 interface ContentCardProps {
   content: Contenido;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export function ContentCard({ content, onClick }: ContentCardProps) {
   const portadaUrl = getAssetUrl(content.portada_url);
-  return (
-    <button
-      onClick={onClick}
-      className="group flex-shrink-0 w-40 md:w-48 lg:w-56 focus:outline-none"
-    >
+  const cardContent = (
+    <>
       {/* Thumbnail */}
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover:border-muted-foreground transition-all duration-200">
+      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover/card:border-muted-foreground transition-all duration-200">
         {portadaUrl ? (
           <img
             src={portadaUrl}
@@ -35,7 +32,7 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
         )}
         
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
             <Play size={24} fill="white" className="text-white ml-1" />
           </div>
@@ -56,7 +53,7 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
       
       {/* Info */}
       <div className="mt-2 text-left">
-        <h3 className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+        <h3 className="text-sm font-medium text-foreground truncate group-hover/card:text-primary transition-colors">
           {content.titulo}
         </h3>
         <div className="flex items-center gap-2 mt-1">
@@ -70,7 +67,24 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
           )}
         </div>
       </div>
-    </button>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="group/card flex-shrink-0 w-40 md:w-48 lg:w-56 focus:outline-none"
+      >
+        {cardContent}
+      </button>
+    );
+  }
+
+  return (
+    <div className="group/card flex-shrink-0 w-40 md:w-48 lg:w-56">
+      {cardContent}
+    </div>
   );
 }
 

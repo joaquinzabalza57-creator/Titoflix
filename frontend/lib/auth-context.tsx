@@ -18,11 +18,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Estado global minimo: cuenta autenticada, perfil elegido y carga inicial.
   const [account, setAccount] = useState<AuthAccount | null>(null);
   const [profile, setProfile] = useState<{ id: number; nombre: string; avatar?: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshAccount = useCallback(async () => {
+    // Revalida el token contra /auth/me. Si el backend lo rechaza, se limpia la sesion.
     if (!isAuthenticatedApi()) {
       setAccount(null);
       setProfile(null);
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Initialize from localStorage
+    // Inicializa desde localStorage para evitar parpadeos al recargar.
     const storedAccount = getStoredAccount();
     const storedProfile = getSelectedProfile();
     
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Refresh account data from server
+    // Luego consulta al backend para confirmar que la sesion siga vigente.
     refreshAccount();
   }, [refreshAccount]);
 

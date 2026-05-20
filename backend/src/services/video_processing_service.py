@@ -26,6 +26,8 @@ QUALITY_PRIORITY = {
 
 @dataclass
 class ProcessedVideoVariants:
+    """Resultado de FFmpeg: variantes subidas, duracion y miniatura opcional."""
+
     max_quality: str
     max_variant: StorageFileUploadResult
     variants: dict[str, StorageFileUploadResult]
@@ -37,6 +39,8 @@ class ProcessedVideoVariants:
 
 
 class VideoProcessingService:
+    """Procesa videos subidos: detecta metadata, transcodifica y sube variantes."""
+
     def __init__(self, storage: StorageService | None = None):
         self.storage = storage or StorageService()
 
@@ -45,6 +49,7 @@ class VideoProcessingService:
         video_file: UploadFile,
         parent_folder_id: str,
     ) -> ProcessedVideoVariants:
+        """Pipeline completo usado por peliculas y episodios al recibir un upload."""
         self._validate_tools()
 
         with tempfile.TemporaryDirectory(prefix="titoflix-video-") as temp_dir:
@@ -100,10 +105,12 @@ class VideoProcessingService:
             )
 
     def _validate_tools(self) -> None:
+        """FFmpeg/ffprobe deben estar instalados en la imagen o entorno local."""
         if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
             raise ConflictError("FFmpeg no esta disponible en el backend")
 
     def _probe_video_metadata(self, source_path: Path) -> dict[str, float | int]:
+        """Lee resolucion y duracion sin cargar el video completo en memoria."""
         command = [
             "ffprobe",
             "-v",
@@ -139,6 +146,7 @@ class VideoProcessingService:
         }
 
     def _quality_for_height(self, height: int) -> str:
+        """Mapea altura real a la calidad maxima que se puede ofrecer."""
         if height >= QUALITY_HEIGHTS["4K"]:
             return "4K"
         if height >= QUALITY_HEIGHTS["QHD"]:
@@ -146,6 +154,7 @@ class VideoProcessingService:
         return "FHD"
 
     def _transcode(self, source_path: Path, output_path: Path, target_height: int) -> None:
+        """Genera una variante MP4 reproducible por navegador."""
         command = [
             "ffmpeg",
             "-y",
@@ -172,6 +181,7 @@ class VideoProcessingService:
             raise ConflictError("No se pudo convertir el video con FFmpeg")
 
     def _extract_thumbnail(self, source_path: Path, output_path: Path, duration_seconds: float) -> bytes:
+        """Toma un frame intermedio para miniaturas de episodios."""
         seek_second = max(1, int(random.uniform(duration_seconds * 0.1, duration_seconds * 0.75)))
         command = [
             "ffmpeg",

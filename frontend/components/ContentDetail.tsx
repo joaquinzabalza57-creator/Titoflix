@@ -12,6 +12,8 @@ interface ContentDetailProps {
 }
 
 export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) {
+  // Este modal es el principal consumidor del contrato de catalogo: trae
+  // temporadas/episodios, pide URLs temporales de playback y administra Mi lista.
   const [temporadas, setTemporadas] = useState<Temporada[]>([]);
   const [episodios, setEpisodios] = useState<Episodio[]>([]);
   const [selectedTemporada, setSelectedTemporada] = useState<Temporada | null>(null);
@@ -24,7 +26,7 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
 
   const profile = getSelectedProfile();
 
-  // Fetch temporadas for series
+  // Las series cargan temporadas bajo demanda para no inflar la respuesta del catalogo.
   useEffect(() => {
     if (content.tipo === "serie") {
       setLoading(true);
@@ -40,7 +42,7 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
     }
   }, [content]);
 
-  // Fetch episodios when temporada changes
+  // Al cambiar temporada se piden episodios desde el endpoint especifico.
   useEffect(() => {
     if (selectedTemporada) {
       setLoading(true);
@@ -51,7 +53,7 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
     }
   }, [selectedTemporada]);
 
-  // Check if content is in Mi Lista
+  // Mi Lista depende del perfil actual guardado en localStorage/auth-context.
   useEffect(() => {
     if (profile) {
       apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`)
@@ -67,6 +69,8 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
   const portadaUrl = getAssetUrl(content.portada_url);
 
   const handlePlayMovie = async () => {
+    // Primero se pide /playback para obtener un stream_url firmado; despues se
+    // entrega al reproductor, que ya puede hacer Range requests contra FastAPI.
     setPlayLoading("movie");
     try {
       const quality = selectedMovieQuality || movieQualities[0] || "";
@@ -84,6 +88,7 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
   };
 
   const handlePlayEpisode = async (episodio: Episodio) => {
+    // Episodios usan el mismo flujo de pelicula, pero con IDs de episodio.
     setPlayLoading(`ep-${episodio.id}`);
     try {
       const qualities = qualityOptions(episodio.video_variants);
@@ -102,6 +107,7 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
   };
 
   const handleToggleMiLista = async () => {
+    // POST/DELETE son idempotentes desde la UI: actualizamos estado local si el backend responde ok.
     if (!profile) return;
     
     setMiListaLoading(true);

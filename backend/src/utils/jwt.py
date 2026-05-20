@@ -1,39 +1,41 @@
-from datetime import datetime, timedelta, timezone             # Utilidades para manejo de fechas y tiempos
-from typing import Any                                         # Soporte para tipos de datos genéricos
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from jose import JWTError, jwt                                 # Librería para codificación y decodificación JWT
+from jose import JWTError, jwt
 
-from src.config import settings                                # Configuración global de la aplicación
-from src.utils import UnauthorizedError                        # Excepción para errores de autenticación
-
-
-ALGORITHM = settings.JWT_ALGORITHM                             # Algoritmo de cifrado (ej. HS256)
+from src.config import settings
+from src.utils import UnauthorizedError
 
 
-def create_access_token(                                       # Función para generar nuevos tokens
-    payload: dict[str, Any],                                   # Datos a incluir en el token
-    expires_delta: timedelta | None = None,                    # Tiempo de expiración opcional
+ALGORITHM = settings.JWT_ALGORITHM
+
+
+def create_access_token(
+    payload: dict[str, Any],
+    expires_delta: timedelta | None = None,
 ) -> str:
-    expire = datetime.now(timezone.utc) + (                    # Calcula el tiempo actual en UTC
+    """Firma un JWT con `exp`; se usa para cuentas y para links temporales de media."""
+    expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
-    data = payload.copy()                                      # Crea copia del payload para no mutar el original
-    data.update({"exp": expire})                               # Agrega el claim de expiración 'exp'
+    data = payload.copy()
+    data.update({"exp": expire})
 
-    return jwt.encode(                                         # Retorna el token codificado y firmado
+    return jwt.encode(
         data,
         settings.JWT_SECRET,
         algorithm=ALGORITHM,
     )
 
 
-def decode_access_token(token: str) -> dict[str, Any]:         # Función para validar y leer tokens
+def decode_access_token(token: str) -> dict[str, Any]:
+    """Valida firma/expiracion y devuelve claims normalizados para middlewares."""
     try:
-        return jwt.decode(                                     # Intenta decodificar el token con la clave secreta
+        return jwt.decode(
             token,
             settings.JWT_SECRET,
             algorithms=[ALGORITHM],
         )
-    except JWTError:                                           # Captura errores de firma, expiración o formato
-        raise UnauthorizedError("Token inválido o expirado")   # Lanza error de no autorizado
+    except JWTError:
+        raise UnauthorizedError("Token invalido o expirado")

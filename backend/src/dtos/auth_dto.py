@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 
+# DTOs de autenticacion: separan requests validadas de tokens/respuestas internas.
 class LoginDTO(BaseModel):
     email: str
     password: str
@@ -12,6 +13,8 @@ class AdminLoginDTO(BaseModel):
 
 
 class TokenDTO(BaseModel):
+    """Respuesta que el frontend guarda para llamadas posteriores."""
+
     access_token: str
     token_type: str = "bearer"
     id: int | None = None

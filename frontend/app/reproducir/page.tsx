@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { reportarVista } from "@/lib/api";
 
-// Report progress every N seconds of playback time
+// Reporta progreso cada N segundos de reproduccion.
 const REPORT_INTERVAL_SECONDS = 5;
-// Threshold to mark as terminado (90%)
+// Umbral acordado con backend para marcar terminado.
 const TERMINADO_THRESHOLD = 0.9;
 
 export default function ReproducirPage() {
+  return (
+    <Suspense fallback={<LoadingPlayer />}>
+      <ReproducirContent />
+    </Suspense>
+  );
+}
+
+function ReproducirContent() {
+  // Reproductor dedicado: valida sesion/perfil y sincroniza progreso con backend.
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, profile, account } = useAuth();
@@ -20,8 +29,10 @@ export default function ReproducirPage() {
   const title = searchParams.get("title") || "Reproduciendo";
   const contenidoId = searchParams.get("contenido_id");
   const episodioId = searchParams.get("episodio_id");
+  const startAt = Number(searchParams.get("start") || "0");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const appliedStartRef = useRef(false);
   const lastReportedRef = useRef<number>(-REPORT_INTERVAL_SECONDS);
   const reportedTerminadoRef = useRef(false);
 
@@ -44,7 +55,7 @@ export default function ReproducirPage() {
     }
   }, [isAuthenticated, isLoading, account, profile, router]);
 
-  // HU6: report progress via POST /perfiles/{id}/vistas
+  // HU6: reporta progreso via POST /perfiles/{id}/vistas.
   const reportProgress = useCallback(
     async (segundos: number, terminado: boolean) => {
       if (!profile?.id) return;
@@ -67,7 +78,7 @@ export default function ReproducirPage() {
         }
         await reportarVista(profile.id, payload);
       } catch {
-        // Silently ignore progress report errors — they shouldn't interrupt playback
+        // Los errores de progreso no deben interrumpir la reproduccion.
       }
     },
     [profile, contenidoId, episodioId]
@@ -81,7 +92,7 @@ export default function ReproducirPage() {
     const duration = video.duration;
     const progress = current / duration;
 
-    // Mark terminado once at 90%+
+    // Marca terminado una sola vez al superar el umbral.
     if (progress >= TERMINADO_THRESHOLD && !reportedTerminadoRef.current) {
       reportedTerminadoRef.current = true;
       reportProgress(current, true);
@@ -89,14 +100,14 @@ export default function ReproducirPage() {
       return;
     }
 
-    // Report every REPORT_INTERVAL_SECONDS
+    // Reporte periodico para alimentar Continuar viendo.
     if (current - lastReportedRef.current >= REPORT_INTERVAL_SECONDS) {
       lastReportedRef.current = current;
       reportProgress(current, false);
     }
   }, [reportProgress]);
 
-  // Report final position on pause / before unload
+  // Reporte final en pausa o cierre de pestana.
   const handlePause = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -108,7 +119,7 @@ export default function ReproducirPage() {
     const handleBeforeUnload = () => {
       const video = videoRef.current;
       if (!video) return;
-      // Best-effort sync report on tab close
+      // Best-effort al cerrar la pestana.
       reportProgress(video.currentTime, false);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -116,18 +127,22 @@ export default function ReproducirPage() {
   }, [reportProgress]);
 
   const handleBack = () => {
-    // Report current position before navigating away
+    // Guarda posicion antes de volver.
     const video = videoRef.current;
     if (video) reportProgress(video.currentTime, false);
     router.back();
   };
 
+  const handleLoadedMetadata = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || appliedStartRef.current || !Number.isFinite(startAt) || startAt <= 0) return;
+    video.currentTime = startAt;
+    appliedStartRef.current = true;
+    lastReportedRef.current = startAt;
+  }, [startAt]);
+
   if (isLoading) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingPlayer />;
   }
 
   if (!streamUrl) {
@@ -143,7 +158,6 @@ export default function ReproducirPage() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header overlay */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black to-transparent">
         <div className="flex items-center gap-4">
           <button
@@ -157,7 +171,6 @@ export default function ReproducirPage() {
         </div>
       </div>
 
-      {/* Video element */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
@@ -167,9 +180,18 @@ export default function ReproducirPage() {
         playsInline
         onTimeUpdate={handleTimeUpdate}
         onPause={handlePause}
+        onLoadedMetadata={handleLoadedMetadata}
       >
         Tu navegador no soporta la reproduccion de video.
       </video>
+    </div>
+  );
+}
+
+function LoadingPlayer() {
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+      <Loader2 className="w-12 h-12 animate-spin text-primary" />
     </div>
   );
 }

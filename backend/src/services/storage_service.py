@@ -18,6 +18,8 @@ from src.utils import ConflictError
 
 @dataclass
 class StorageFileUploadResult:
+    """Resultado comun para subidas de video o imagen a MinIO/S3."""
+
     object_key: str
     mime_type: str | None
     size: int | None
@@ -25,12 +27,16 @@ class StorageFileUploadResult:
 
 @dataclass
 class StorageStreamResult:
+    """Stream y headers listos para devolver desde FastAPI."""
+
     status_code: int
     headers: dict[str, str]
     chunks: Iterator[bytes]
 
 
 class StorageService:
+    """Adaptador de storage: encapsula boto3 para que el dominio no dependa de MinIO."""
+
     def __init__(self):
         self.bucket_name = settings.S3_BUCKET_NAME
         self.client = boto3.client(
@@ -44,6 +50,7 @@ class StorageService:
         self._ensure_bucket()
 
     def create_folder(self, name: str, parent_folder_id: str | None = None) -> str:
+        """Genera un prefijo estable; S3 no tiene carpetas reales, solo object keys."""
         prefix = parent_folder_id.strip("/") if parent_folder_id else settings.S3_MEDIA_PREFIX.strip("/")
         folder_name = f"{self._safe_name(name)}-{uuid4().hex[:8]}"
         return f"{prefix}/{folder_name}".strip("/")
@@ -110,6 +117,7 @@ class StorageService:
         perfil_id: int,
         filename: str = "avatar",
     ) -> StorageFileUploadResult:
+        """Recibe avatares en base64 desde el frontend y los guarda como imagen."""
         match = re.match(r"^data:(?P<mime>[-\w.+/]+);base64,(?P<data>.+)$", data_url, re.DOTALL)
         if not match:
             raise ConflictError("El asset debe enviarse como imagen base64")
@@ -203,6 +211,7 @@ class StorageService:
         range_header: str | None = None,
         fallback_mime_type: str = "video/mp4",
     ) -> StorageStreamResult:
+        """Lee objetos con soporte de Range para scrubbing del reproductor HTML5."""
         params = {"Bucket": self.bucket_name, "Key": object_key}
         if range_header:
             params["Range"] = range_header
@@ -253,6 +262,7 @@ class StorageService:
             raise ConflictError("No se pudo eliminar el archivo del storage")
 
     def delete_prefix(self, prefix: str | None) -> None:
+        """Borra todos los objetos bajo un prefijo logico."""
         if not prefix:
             return
 
@@ -272,12 +282,14 @@ class StorageService:
             raise ConflictError("No se pudo eliminar la carpeta del storage")
 
     def _ensure_bucket(self) -> None:
+        """Crea el bucket local si MinIO arranco vacio."""
         try:
             self.client.head_bucket(Bucket=self.bucket_name)
         except ClientError:
             self.client.create_bucket(Bucket=self.bucket_name)
 
     def _safe_name(self, value: str) -> str:
+        """Limpia nombres de usuario/archivo antes de usarlos en object keys."""
         value = Path(value).name.strip()
         value = re.sub(r"[^a-zA-Z0-9._ -]+", "", value)
         value = re.sub(r"\s+", "-", value)
