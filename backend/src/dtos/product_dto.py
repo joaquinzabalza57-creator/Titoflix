@@ -190,6 +190,29 @@ class MiListaDTO(BaseModel):
     contenido_id: int
 
 
+class ReporteGeneroVisualizacionDTO(BaseModel):
+    id: int
+    nombre: str
+    minutos_vistos: int
+
+
+class ReporteContenidoVisualizacionDTO(BaseModel):
+    contenido_id: int
+    titulo: str
+    tipo: str
+    minutos_vistos: int
+    generos: list[ReporteGeneroVisualizacionDTO] = Field(default_factory=list)
+
+
+class ReporteVisualizacionDTO(BaseModel):
+    anio: int
+    mes: int
+    total_minutos: int
+    total_contenidos: int
+    contenidos: list[ReporteContenidoVisualizacionDTO] = Field(default_factory=list)
+    generos: list[ReporteGeneroVisualizacionDTO] = Field(default_factory=list)
+
+
 # Alias legacy para mantener compatibilidad con imports viejos del proyecto.
 CreateProductDTO = CreateContenidoDTO
 UpdateProductDTO = UpdateContenidoDTO

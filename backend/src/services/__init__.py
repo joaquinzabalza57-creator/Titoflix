@@ -7,6 +7,7 @@ from src.services.product_service import (
     EpisodioService,
     GeneroService,
     MiListaService,
+    ReporteService,
     TemporadaService,
     VistaService,
 )
@@ -23,5 +24,6 @@ __all__ = [
     "EpisodioService",
     "VistaService",
     "MiListaService",
+    "ReporteService",
     "CalificacionService",
 ]

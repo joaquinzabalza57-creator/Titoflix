@@ -20,6 +20,7 @@ from src.dtos import (
     ContenidoResponseDTO,
     EpisodioResponseDTO,
     GeneroResponseDTO,
+    ReporteVisualizacionDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
     VistaResponseDTO,
@@ -40,6 +41,7 @@ from src.services.product_service import (
     EpisodioService,
     GeneroService,
     MiListaService,
+    ReporteService,
     TemporadaService,
     VistaService,
 )
@@ -243,6 +245,16 @@ def search_contenidos(
 @router.get("/contenidos/top", response_model=list[ContenidoResponseDTO])
 def top_contenidos(genero: str | None = None, db: Session = Depends(get_db)):
     return ContenidoService(db).top(genero=genero)
+
+
+@router.get("/reportes/visualizacion", response_model=ReporteVisualizacionDTO)
+def reporte_visualizacion(
+    anio: int = Query(..., ge=2000, le=2100),
+    mes: int = Query(..., ge=1, le=12),
+    _admin: Cuenta = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return ReporteService(db).visualizacion(anio=anio, mes=mes)
 
 
 @router.get("/contenidos/{contenido_id}", response_model=ContenidoResponseDTO)

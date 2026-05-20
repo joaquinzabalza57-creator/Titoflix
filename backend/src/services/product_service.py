@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,6 +15,9 @@ from src.dtos import (
     CreateVistaDTO,
     EpisodioResponseDTO,
     GeneroResponseDTO,
+    ReporteContenidoVisualizacionDTO,
+    ReporteGeneroVisualizacionDTO,
+    ReporteVisualizacionDTO,
     VideoProcessingWarningDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
@@ -788,6 +793,104 @@ class VistaService:
                 )
             )
         return items
+
+
+class ReporteService:
+    """Reportes administrativos sobre consumo de contenido."""
+
+    def __init__(self, db: Session):
+        self.vista_repo = VistaRepository(db)
+
+    def visualizacion(self, anio: int, mes: int) -> ReporteVisualizacionDTO:
+        start, end = self._month_range(anio, mes)
+        content_totals: dict[int, dict] = {}
+        genre_totals: dict[int, dict] = {}
+
+        for vista in self.vista_repo.list_for_visualization_report(start, end):
+            contenido = vista.contenido
+            duracion_min = contenido.duracion_min if contenido else None
+            if vista.episodio is not None:
+                contenido = vista.episodio.temporada.contenido
+                duracion_min = vista.episodio.duracion_min
+
+            if not contenido or not duracion_min:
+                continue
+
+            duracion_seg = duracion_min * 60
+            if not (vista.terminado or vista.segundos_vistos >= duracion_seg * 0.9):
+                continue
+
+            minutos = max(0, round(vista.segundos_vistos / 60))
+            if minutos <= 0:
+                continue
+
+            content_entry = content_totals.setdefault(
+                contenido.id,
+                {
+                    "contenido": contenido,
+                    "minutos": 0,
+                    "generos": {},
+                },
+            )
+            content_entry["minutos"] += minutos
+
+            for genero in contenido.generos:
+                content_entry["generos"][genero.id] = genero
+                genre_entry = genre_totals.setdefault(
+                    genero.id,
+                    {"genero": genero, "minutos": 0},
+                )
+                genre_entry["minutos"] += minutos
+
+        top_contents = sorted(
+            content_totals.values(),
+            key=lambda item: (-item["minutos"], item["contenido"].titulo),
+        )[:20]
+        genre_items = sorted(
+            genre_totals.values(),
+            key=lambda item: (-item["minutos"], item["genero"].nombre),
+        )
+
+        contenidos = [
+            ReporteContenidoVisualizacionDTO(
+                contenido_id=item["contenido"].id,
+                titulo=item["contenido"].titulo,
+                tipo=item["contenido"].tipo,
+                minutos_vistos=item["minutos"],
+                generos=[
+                    ReporteGeneroVisualizacionDTO(
+                        id=genero.id,
+                        nombre=genero.nombre,
+                        minutos_vistos=item["minutos"],
+                    )
+                    for genero in sorted(item["generos"].values(), key=lambda genero: genero.nombre)
+                ],
+            )
+            for item in top_contents
+        ]
+
+        total_minutos = sum(item["minutos"] for item in content_totals.values())
+        return ReporteVisualizacionDTO(
+            anio=anio,
+            mes=mes,
+            total_minutos=total_minutos,
+            total_contenidos=len(content_totals),
+            contenidos=contenidos,
+            generos=[
+                ReporteGeneroVisualizacionDTO(
+                    id=item["genero"].id,
+                    nombre=item["genero"].nombre,
+                    minutos_vistos=item["minutos"],
+                )
+                for item in genre_items
+            ],
+        )
+
+    def _month_range(self, anio: int, mes: int) -> tuple[datetime, datetime]:
+        start = datetime(anio, mes, 1)
+        if mes == 12:
+            return start, datetime(anio + 1, 1, 1)
+        return start, datetime(anio, mes + 1, 1)
 
 
 class MiListaService:

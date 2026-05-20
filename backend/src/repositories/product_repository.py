@@ -1,5 +1,7 @@
 from sqlalchemy import func
-from sqlalchemy.orm import Session, aliased
+from datetime import datetime
+
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from src.db import Calificacion, Contenido, Episodio, Genero, Temporada, VideoVariant, Vista
 
@@ -468,6 +470,7 @@ class VistaRepository:
 
         vista.segundos_vistos = segundos_vistos
         vista.terminado = terminado
+        vista.fecha = func.now()
 
         self.db.commit()
         self.db.refresh(vista)
@@ -508,6 +511,20 @@ class VistaRepository:
                 Vista.segundos_vistos > 0,
             )
             .order_by(Vista.fecha.desc())
+            .all()
+        )
+
+    def list_for_visualization_report(self, start: datetime, end: datetime) -> list[Vista]:
+        return (
+            self.db.query(Vista)
+            .options(
+                joinedload(Vista.contenido).joinedload(Contenido.generos),
+                joinedload(Vista.episodio)
+                .joinedload(Episodio.temporada)
+                .joinedload(Temporada.contenido)
+                .joinedload(Contenido.generos),
+            )
+            .filter(Vista.fecha >= start, Vista.fecha < end)
             .all()
         )
 
