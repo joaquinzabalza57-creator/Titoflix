@@ -17,7 +17,6 @@ from sqlalchemy.sql import func
 from src.db.connection import Base
 
 
-# Tabla puente N:M entre contenidos y generos del catalogo.
 contenido_generos = Table(
     "contenido_generos",
     Base.metadata,
@@ -26,7 +25,6 @@ contenido_generos = Table(
 )
 
 
-# Tabla puente N:M para "Mi lista" por perfil, con fecha de agregado.
 mi_lista = Table(
     "mi_lista",
     Base.metadata,
@@ -37,8 +35,6 @@ mi_lista = Table(
 
 
 class Genero(Base):
-    """Categoria editorial usada para filtrar y agrupar contenidos."""
-
     __tablename__ = "generos"
 
     id = Column(Integer, primary_key=True)
@@ -52,8 +48,6 @@ class Genero(Base):
 
 
 class Contenido(Base):
-    """Pelicula o serie visible en el catalogo principal."""
-
     __tablename__ = "contenidos"
 
     id = Column(Integer, primary_key=True)
@@ -63,7 +57,6 @@ class Contenido(Base):
     descripcion = Column(String, nullable=True)
     duracion_min = Column(Float, nullable=True)
     clasificacion_edad = Column(String, nullable=False)
-    # Metadatos de storage: Postgres guarda referencias, MinIO guarda los bytes.
     storage_folder_id = Column(String, nullable=True)
     video_storage_key = Column(String, nullable=True)
     video_mime = Column(String, nullable=True)
@@ -103,8 +96,6 @@ class Contenido(Base):
 
 
 class Temporada(Base):
-    """Agrupa episodios de una serie."""
-
     __tablename__ = "temporadas"
 
     id = Column(Integer, primary_key=True)
@@ -126,8 +117,6 @@ class Temporada(Base):
 
 
 class Episodio(Base):
-    """Unidad reproducible de una temporada."""
-
     __tablename__ = "episodios"
 
     id = Column(Integer, primary_key=True)
@@ -155,8 +144,6 @@ class Episodio(Base):
 
 
 class VideoVariant(Base):
-    """Version transcodificada de un video en una calidad concreta."""
-
     __tablename__ = "video_variants"
 
     id = Column(Integer, primary_key=True)
@@ -174,7 +161,6 @@ class VideoVariant(Base):
         UniqueConstraint("contenido_id", "quality", name="uq_video_variant_contenido_quality"),
         UniqueConstraint("episodio_id", "quality", name="uq_video_variant_episodio_quality"),
         CheckConstraint(
-            # Una variante pertenece a una pelicula o a un episodio, nunca a ambos.
             "(contenido_id IS NOT NULL AND episodio_id IS NULL) OR "
             "(contenido_id IS NULL AND episodio_id IS NOT NULL)",
             name="ck_video_variant_un_solo_recurso",
@@ -184,8 +170,6 @@ class VideoVariant(Base):
 
 
 class Vista(Base):
-    """Progreso de reproduccion de un perfil sobre una pelicula o episodio."""
-
     __tablename__ = "vistas"
 
     id = Column(Integer, primary_key=True)
@@ -204,7 +188,6 @@ class Vista(Base):
         UniqueConstraint("perfil_id", "episodio_id", name="uq_vista_perfil_episodio"),
         UniqueConstraint("perfil_id", "contenido_id", name="uq_vista_perfil_contenido"),
         CheckConstraint(
-            # Una vista registra pelicula directa o episodio, no los dos a la vez.
             "(episodio_id IS NOT NULL AND contenido_id IS NULL) OR "
             "(episodio_id IS NULL AND contenido_id IS NOT NULL)",
             name="ck_vista_un_solo_recurso",
@@ -213,8 +196,6 @@ class Vista(Base):
 
 
 class Calificacion(Base):
-    """Puntaje dado por un perfil a un contenido."""
-
     __tablename__ = "calificaciones"
 
     id = Column(Integer, primary_key=True)

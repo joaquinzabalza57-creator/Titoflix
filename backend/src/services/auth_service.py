@@ -7,14 +7,11 @@ from src.utils import UnauthorizedError, create_access_token, verify_password
 
 
 class AuthService:
-    """Orquesta autenticacion de cuentas y seleccion segura de perfiles."""
-
     def __init__(self, db: Session):
         self.cuenta_repo = CuentaRepository(db)
         self.perfil_repo = PerfilRepository(db)
 
     def login(self, dto: LoginDTO) -> TokenDTO:
-        """Valida email/password y emite el token que usa el frontend."""
         cuenta = self.cuenta_repo.find_by_email(dto.email)
 
         if not cuenta or not verify_password(dto.password, cuenta.password_hash):
@@ -36,7 +33,6 @@ class AuthService:
         )
 
     def admin_login(self, dto: AdminLoginDTO) -> TokenDTO:
-        """Autentica administradores por usuario+password o solo password admin."""
         cuenta = None
 
         if dto.username:
@@ -72,7 +68,6 @@ class AuthService:
         )
 
     def get_current_account(self, cuenta_id: int) -> AuthAccountDTO:
-        """Recupera la cuenta actual para rehidratar estado en el cliente."""
         cuenta = self.cuenta_repo.find_by_id(cuenta_id)
         if not cuenta:
             raise UnauthorizedError("Cuenta no encontrada")
@@ -85,7 +80,6 @@ class AuthService:
         )
 
     def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> PerfilAuthResponseDTO:
-        """Valida que el perfil sea de la cuenta y que el PIN coincida si existe."""
         perfil = self.perfil_repo.find_by_id(perfil_id)
 
         if not perfil or perfil.cuenta_id != cuenta_id:

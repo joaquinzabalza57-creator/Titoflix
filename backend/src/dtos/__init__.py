@@ -2,7 +2,6 @@ from .auth_dto import AdminLoginDTO, AuthAccountDTO, LoginDTO, PerfilAuthDTO, Pe
 from .product_dto import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
-    ContinuarViendoDTO,
     CreateCalificacionDTO,
     CreateContenidoDTO,
     CreateEpisodioDTO,
@@ -49,7 +48,6 @@ __all__ = [
     "CreateContenidoDTO",
     "UpdateContenidoDTO",
     "ContenidoResponseDTO",
-    "ContinuarViendoDTO",
     "CreateProductDTO",
     "UpdateProductDTO",
     "ProductResponseDTO",

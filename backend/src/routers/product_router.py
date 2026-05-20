@@ -12,7 +12,6 @@ from src.db.models import Cuenta, Perfil
 from src.dtos import (
     CreateCalificacionDTO,
     CreateContenidoDTO,
-    ContinuarViendoDTO,
     CreateEpisodioDTO,
     CreateTemporadaDTO,
     CreateVistaDTO,
@@ -30,7 +29,6 @@ from src.schemas.product_schema import (
     CreateTemporadaSchema,
     UpdateEpisodioSchema,
     UpdateTemporadaSchema,
-    MiListaSchema,
     UpsertCalificacionSchema,
     UpsertVistaSchema,
 )
@@ -61,7 +59,6 @@ def _create_media_token(
     quality: str | None,
     action: str,
 ) -> str:
-    """Crea un JWT corto para que el frontend reproduzca media sin exponer storage."""
     return create_access_token(
         {
             "sub": str(current_user.id),
@@ -82,7 +79,6 @@ def _verify_media_token(
     quality: str | None,
     action: str,
 ) -> None:
-    """Valida que el token temporal corresponda exactamente al recurso pedido."""
     payload = decode_access_token(token)
     if (
         payload.get("scope") != "media"
@@ -101,7 +97,6 @@ def _stream_storage_video(
     filename: str | None = None,
     as_attachment: bool = False,
 ) -> StreamingResponse:
-    """Puente HTTP entre el reproductor del navegador y el objeto guardado en MinIO."""
     stream = StorageService().stream_file(
         object_key=file_id,
         range_header=request.headers.get("range"),
@@ -120,7 +115,6 @@ def _stream_storage_video(
 
 
 def _content_disposition(filename: str, mime_type: str) -> str:
-    """Genera un nombre seguro para descargas sin confiar en el titulo original."""
     safe_name = re.sub(r"[^a-zA-Z0-9._ -]+", "", filename).strip() or "titoflix-video"
     safe_name = re.sub(r"\s+", "-", safe_name)
     extension = mimetypes.guess_extension(mime_type) or ".mp4"
@@ -136,7 +130,6 @@ def _vista_dto_from_request(
     episodio_id: int | None = None,
     contenido_id: int | None = None,
 ) -> CreateVistaDTO:
-    """Normaliza payloads de progreso enviados por el frontend."""
     payload_data = payload.model_dump()
     payload_episodio_id = payload_data.pop("episodio_id")
     payload_contenido_id = payload_data.pop("contenido_id")
@@ -155,7 +148,6 @@ def _calificacion_dto_from_request(
     contenido_id: int,
     payload: UpsertCalificacionSchema,
 ) -> CreateCalificacionDTO:
-    """Combina la ruta y el body en el DTO usado por la capa de servicio."""
     payload_data = payload.model_dump()
     return CreateCalificacionDTO(
         perfil_id=perfil_id,
@@ -257,7 +249,6 @@ def get_contenido_playback(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Devuelve al frontend una URL firmada que luego consume el elemento <video>."""
     video = ContenidoService(db).get_video_source(contenido_id, quality)
     token = _create_media_token(current_user, "contenido", contenido_id, quality, "stream")
     return {
@@ -278,7 +269,6 @@ def stream_contenido_video(
     quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    """Stream real de peliculas; soporta Range requests para seek del reproductor."""
     _verify_media_token(token, "contenido", contenido_id, quality, "stream")
     video = ContenidoService(db).get_video_source(contenido_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
@@ -409,7 +399,6 @@ def get_episodio_playback(
     current_user: Cuenta = Depends(get_current_user_from_swagger),
     db: Session = Depends(get_db),
 ):
-    """Mismo contrato que peliculas, pero resolviendo el video desde un episodio."""
     video = EpisodioService(db).get_video_source(episodio_id, quality)
     token = _create_media_token(current_user, "episodio", episodio_id, quality, "stream")
     return {
@@ -430,7 +419,6 @@ def stream_episodio_video(
     quality: str | None = None,
     db: Session = Depends(get_db),
 ):
-    """Stream real de episodios; el token evita compartir URLs permanentes."""
     _verify_media_token(token, "episodio", episodio_id, quality, "stream")
     video = EpisodioService(db).get_video_source(episodio_id, quality)
     return _stream_storage_video(video.file_id, video.mime_type, request)
@@ -487,7 +475,6 @@ def create_vista_recurso(
     profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    """Registra progreso de reproduccion para continuar viendo."""
     dto = _vista_dto_from_request(
         perfil_id=profile.id,
         payload=payload,
@@ -530,25 +517,23 @@ def delete_vista_recurso(
     )
 
 
-@router.get("/perfiles/{perfil_id}/continuar", response_model=list[ContinuarViendoDTO])
+@router.get("/perfiles/{perfil_id}/continuar", response_model=list[VistaResponseDTO])
 def continuar_viendo(
     perfil_id: int,
     profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    """Lista items incompletos que el frontend muestra en la fila Continuar viendo."""
     return VistaService(db).continuar_viendo(profile.id)
 
 
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,
-    payload: MiListaSchema,
+    contenido_id: int,
     profile: Perfil = Depends(get_owned_profile),
     db: Session = Depends(get_db),
 ):
-    """Agrega contenido a la lista personal del perfil autenticado."""
-    return MiListaService(db).add(profile.id, payload.contenido_id)
+    return MiListaService(db).add(profile.id, contenido_id)
 
 
 @router.get("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])

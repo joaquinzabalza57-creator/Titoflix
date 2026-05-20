@@ -1,31 +1,40 @@
-"""Exports de base de datos para simplificar imports del resto del backend."""
+# ============================================================================
+# IMPORTS DE CONEXIÓN Y SESIONES
+# ============================================================================
+from .connection import Base, get_db, engine, SessionLocal, create_tables, drop_tables, reset_database
 
-from .connection import Base, SessionLocal, create_tables, drop_tables, engine, get_db, reset_database
+# ============================================================================
+# IMPORTS DE TODOS LOS MODELOS
+# ============================================================================
 from .models import (
-    Calificacion,
-    Contenido,
     Cuenta,
-    Episodio,
-    Genero,
     Perfil,
+    Genero,
+    Contenido,
     Temporada,
+    Episodio,
     VideoVariant,
     Vista,
+    Calificacion,
     contenido_generos,
     mi_lista,
 )
 
-
+# ============================================================================
+# EXPORTS (para que sea fácil importar desde cualquier lado)
+# ============================================================================
 __all__ = [
+    # Conexión
     "Base",
-    "get_db",
+    "get_db", 
     "engine",
     "SessionLocal",
     "create_tables",
     "drop_tables",
     "reset_database",
+    # Modelos
     "Cuenta",
-    "Perfil",
+    "Perfil", 
     "Genero",
     "Contenido",
     "Temporada",

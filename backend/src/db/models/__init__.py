@@ -1,29 +1,26 @@
-"""Barrel de modelos ORM y tablas puente."""
-
-from src.db.models.user_model import Cuenta, Perfil
-from src.db.models.product_model import (
-    Calificacion,
-    Contenido,
-    Episodio,
-    Genero,
-    Temporada,
+from src.db.models.user_model import Cuenta, Perfil          # Modelos de usuario
+from src.db.models.product_model import (                    # Modelos de producto
+    Calificacion,                                            # Modelo de calificación
+    Contenido,                                               # Modelo de contenido
+    Episodio,                                                # Modelo de episodio
+    Genero,                                                  # Modelo de género
+    Temporada,                                               # Modelo de temporada
     VideoVariant,
-    Vista,
-    contenido_generos,
-    mi_lista,
+    Vista,                                                   # Modelo de vista
+    contenido_generos,                                       # Tabla relacional contenido-género
+    mi_lista,                                                # Tabla relacional perfil-contenido
 )
 
-
 __all__ = [
-    "Cuenta",
-    "Perfil",
-    "Genero",
-    "Contenido",
-    "Temporada",
-    "Episodio",
+    "Cuenta",                                                # Exporta modelo Cuenta
+    "Perfil",                                                # Exporta modelo Perfil
+    "Genero",                                                # Exporta modelo Género
+    "Contenido",                                             # Exporta modelo Contenido
+    "Temporada",                                             # Exporta modelo Temporada
+    "Episodio",                                              # Exporta modelo Episodio
     "VideoVariant",
-    "Vista",
-    "Calificacion",
-    "contenido_generos",
-    "mi_lista",
+    "Vista",                                                 # Exporta modelo Vista
+    "Calificacion",                                          # Exporta modelo Calificación
+    "contenido_generos",                                     # Exporta tabla relacional
+    "mi_lista",                                              # Exporta tabla relacional
 ]

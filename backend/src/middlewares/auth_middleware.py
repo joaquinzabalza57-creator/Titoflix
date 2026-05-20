@@ -22,7 +22,6 @@ perfil_auth_scheme = HTTPBearer(
 
 
 def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> Cuenta:
-    """Dependencia compatible con headers manuales fuera de Swagger."""
     return get_user_from_authorization(authorization, db)
 
 
@@ -30,7 +29,6 @@ def get_current_user_from_swagger(
     credentials: HTTPAuthorizationCredentials | None = Security(cuenta_auth_scheme),
     db: Session = Depends(get_db),
 ) -> Cuenta:
-    """Dependencia principal para endpoints protegidos con bearer token de cuenta."""
     token = credentials.credentials if credentials else None
     return get_user_from_token(token, db)
 
@@ -39,21 +37,18 @@ def get_optional_current_user_from_swagger(
     credentials: HTTPAuthorizationCredentials | None = Security(cuenta_auth_scheme),
     db: Session = Depends(get_db),
 ) -> Cuenta | None:
-    """Permite endpoints mixtos: anonimos, pero con permisos extra si hay token."""
     if credentials is None:
         return None
     return get_user_from_token(credentials.credentials, db)
 
 
 def require_admin(current_user: Cuenta = Depends(get_current_user_from_swagger)) -> Cuenta:
-    """Guard reutilizable para endpoints de administracion."""
     if not current_user.is_admin:
         raise ForbiddenError("Solo una cuenta admin puede realizar esta accion")
     return current_user
 
 
 def get_owned_profile(perfil_id: int, current_user: Cuenta = Depends(get_current_user_from_swagger), db: Session = Depends(get_db)) -> Perfil:
-    """Asegura que el perfil de la ruta pertenezca a la cuenta autenticada."""
     perfil = PerfilRepository(db).find_by_id(perfil_id)
     if not perfil or (perfil.cuenta_id != current_user.id and not current_user.is_admin):
         raise UnauthorizedError("Perfil no autorizado")
@@ -61,7 +56,6 @@ def get_owned_profile(perfil_id: int, current_user: Cuenta = Depends(get_current
 
 
 def get_user_from_authorization(authorization: str | None, db: Session) -> Cuenta:
-    """Extrae bearer token desde un header Authorization crudo."""
     if not authorization:
         raise UnauthorizedError("Missing or malformed Authorization header")
 
@@ -90,7 +84,6 @@ def get_user_from_token(token: str | None, db: Session) -> Cuenta:
 
 
 def get_profile_from_authorization(access_token: str | None, db: Session) -> Perfil:
-    """Valida tokens de perfil cuando un flujo necesita identidad de perfil."""
     if not access_token:
         raise UnauthorizedError("Missing profile access token")
 

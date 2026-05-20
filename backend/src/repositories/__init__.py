@@ -1,25 +1,23 @@
-"""Barrel de repositorios para imports cortos desde servicios."""
-
 from .product_repository import (
-    CalificacionRepository,
-    ContenidoRepository,
-    EpisodioRepository,
-    GeneroRepository,
-    TemporadaRepository,
+    CalificacionRepository,          # Repositorio de Calificaciones
+    ContenidoRepository,             # Repositorio de Contenido
+    EpisodioRepository,              # Repositorio de Episodios
+    GeneroRepository,                # Repositorio de Géneros
+    TemporadaRepository,             # Repositorio de Temporadas
     VideoVariantRepository,
-    VistaRepository,
+    VistaRepository,                 # Repositorio de Vistas
 )
 from .user_repository import CuentaRepository, PerfilRepository
+# Repositorio de Cuentas, Perfiles y Usuarios
 
-
-__all__ = [
-    "CuentaRepository",
-    "PerfilRepository",
-    "GeneroRepository",
-    "ContenidoRepository",
-    "TemporadaRepository",
+__all__ = [               # Exporta Repositorio de Usuarios
+    "CuentaRepository",              # Exporta Repositorio de Cuentas
+    "PerfilRepository",              # Exporta Repositorio de Perfiles
+    "GeneroRepository",              # Exporta Repositorio de Géneros
+    "ContenidoRepository",           # Exporta Repositorio de Contenido
+    "TemporadaRepository",           # Exporta Repositorio de Temporadas
     "VideoVariantRepository",
-    "EpisodioRepository",
-    "VistaRepository",
-    "CalificacionRepository",
+    "EpisodioRepository",            # Exporta Repositorio de Episodios
+    "VistaRepository",               # Exporta Repositorio de Vistas
+    "CalificacionRepository",        # Exporta Repositorio de Calificaciones
 ]

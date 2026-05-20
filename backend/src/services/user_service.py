@@ -1,71 +1,72 @@
 from typing import cast
+from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
 
-from sqlalchemy.orm import Session
+from src.dtos import (                                  # Importa DTOs de Usuario
+    CreateCuentaDTO,                                             # DTO para creación de Cuenta
+    CreatePerfilDTO,                                             # DTO para creación de Perfil
+    CuentaResponseDTO,                                           # DTO para respuesta de Cuenta
+    PerfilResponseDTO,                                           # DTO para respuesta de Perfil
+    UpdateCuentaDTO,                                             # DTO para actualización de Cuenta
+    UpdatePerfilDTO,                                             # DTO para actualización de Perfil
+)
+from src.mappers import (                         # Importa funciones de mapeo de usuario
+    to_cuenta_response,                                      # Mapper de Cuenta a DTO
+    to_cuenta_response_list,                                 # Mapper de lista de Cuentas a DTOs
+    to_perfil_response,                                      # Mapper de Perfil a DTO
+    to_perfil_response_list,                                 # Mapper de lista de Perfiles a DTOs
+)
+from src.repositories import CuentaRepository, PerfilRepository                                        
+# Importa repositorios de datos
+# Repositorio para Cuentas y para Perfiles
 
 from src.config.env import settings
-from src.dtos import (
-    CreateCuentaDTO,
-    CreatePerfilDTO,
-    CuentaResponseDTO,
-    PerfilResponseDTO,
-    UpdateCuentaDTO,
-    UpdatePerfilDTO,
-)
-from src.mappers import (
-    to_cuenta_response,
-    to_cuenta_response_list,
-    to_perfil_response,
-    to_perfil_response_list,
-)
-from src.repositories import CuentaRepository, PerfilRepository
 from src.services.storage_service import StorageService
 from src.utils import ConflictError, NotFoundError, hash_password
 
 
-# Reglas comerciales simples del plan. Se validan tanto al crear perfiles como
-# al degradar el plan de una cuenta existente.
-PLAN_LIMITS = {
-    "basico": 1,
-    "estandar": 2,
-    "premium": 5,
+PLAN_LIMITS = {                                      # Define los límites de perfiles permitidos por plan
+    "basico": 1,                                     # Límite de perfiles para el plan básico
+    "estandar": 2,                                   # Límite de perfiles para el plan estándar
+    "premium": 5,                                    # Límite de perfiles para el plan premium
 }
 
 
-class CuentaService:
-    """Logica de negocio para cuentas: passwords, planes y limpieza de assets."""
-
-    def __init__(self, db: Session):
-        self.cuenta_repo = CuentaRepository(db)
+class CuentaService:                                            # Servicio para lógica de negocio de Cuentas
+    def __init__(self, db: Session):                            # Inicializa el servicio con sesión de BD
+        self.cuenta_repo = CuentaRepository(db)                 # Instancia el repositorio de Cuentas
         self.perfil_repo = PerfilRepository(db)
 
-    def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO:
-        """Crea una cuenta con password hasheada y email unico."""
-        existing = self.cuenta_repo.find_by_email(dto.email)
-        if existing:
-            raise ConflictError("Ya existe una cuenta con ese email")
+    def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO: # Crea una nueva cuenta
+        existing = self.cuenta_repo.find_by_email(dto.email)    # Verifica si el email ya está registrado
 
-        cuenta = self.cuenta_repo.create(
+        if existing:                                            # Si ya existe, lanza error de conflicto
+            raise ConflictError("Ya existe una cuenta con ese email")
+        
+        password_hash = hash_password(dto.password)
+
+        cuenta = self.cuenta_repo.create(                       # Persiste la nueva cuenta
             email=dto.email,
-            password_hash=hash_password(dto.password),
+            password_hash=password_hash,
             plan=dto.plan,
             is_admin=dto.is_admin,
         )
-        return to_cuenta_response(cuenta)
 
-    def get_by_id(self, cuenta_id: int) -> CuentaResponseDTO:
-        """Obtiene una cuenta o traduce ausencia a NotFoundError."""
-        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
-        if not cuenta:
+        return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
+
+    def get_by_id(self, cuenta_id: int) -> CuentaResponseDTO:   # Busca una cuenta por ID
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)         # Obtiene cuenta del repositorio
+
+        if not cuenta:                                          # Si no existe, lanza error de no encontrado
             raise NotFoundError("Cuenta no encontrada")
-        return to_cuenta_response(cuenta)
 
-    def list_all(self) -> list[CuentaResponseDTO]:
-        """Lista cuentas para la consola administrativa."""
-        return to_cuenta_response_list(self.cuenta_repo.list_all())
+        return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
 
-    def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO:
-        """Actualiza datos sensibles validando duplicados y limites del plan."""
-        fields = dto.model_dump(exclude_unset=True)
+    def list_all(self) -> list[CuentaResponseDTO]:              # Obtiene listado de todas las cuentas
+        cuentas = self.cuenta_repo.list_all()                   # Consulta todas las cuentas
+        return to_cuenta_response_list(cuentas)                 # Retorna lista de respuestas mapeadas
+
+    def update(self, cuenta_id: int, dto: UpdateCuentaDTO) -> CuentaResponseDTO: # Actualiza datos de una cuenta
+        fields = dto.model_dump(exclude_unset=True)             # Extrae solo los campos enviados
 
         if "email" in fields:
             existing = self.cuenta_repo.find_by_email(fields["email"])
@@ -80,13 +81,14 @@ class CuentaService:
             if len(perfiles) > PLAN_LIMITS[fields["plan"]]:
                 raise ConflictError("La cuenta tiene mas perfiles que los permitidos por ese plan")
 
-        cuenta = self.cuenta_repo.update(cuenta_id, **fields)
-        if not cuenta:
-            raise NotFoundError("Cuenta no encontrada")
-        return to_cuenta_response(cuenta)
+        cuenta = self.cuenta_repo.update(cuenta_id, **fields)   # Realiza la actualización
 
-    def delete(self, cuenta_id: int) -> None:
-        """Elimina la cuenta y los assets de todos sus perfiles."""
+        if not cuenta:                                          # Si no existe, lanza error
+            raise NotFoundError("Cuenta no encontrada")
+
+        return to_cuenta_response(cuenta)                       # Retorna cuenta actualizada
+
+    def delete(self, cuenta_id: int) -> None:                   # Elimina una cuenta
         cuenta = self.cuenta_repo.find_by_id(cuenta_id)
         if not cuenta:
             raise NotFoundError("Cuenta no encontrada")
@@ -94,36 +96,40 @@ class CuentaService:
         StorageService().delete_prefix(
             f"{settings.S3_ASSETS_PREFIX.strip('/')}/cuentas/{cuenta_id}"
         )
-        if not self.cuenta_repo.delete(cuenta_id):
+        deleted = self.cuenta_repo.delete(cuenta_id)            # Ejecuta eliminación
+
+        if not deleted:                                         # Si no pudo eliminar (no existe), lanza error
             raise NotFoundError("Cuenta no encontrada")
 
 
-class PerfilService:
-    """Logica de perfiles: limites por plan, PIN, avatar y control infantil."""
+class PerfilService:                                            # Servicio para lógica de negocio de Perfiles
+    def __init__(self, db: Session):                            # Inicializa repositorios requeridos
+        self.cuenta_repo = CuentaRepository(db)                 # Repositorio de Cuentas
+        self.perfil_repo = PerfilRepository(db)                 # Repositorio de Perfiles
 
-    def __init__(self, db: Session):
-        self.cuenta_repo = CuentaRepository(db)
-        self.perfil_repo = PerfilRepository(db)
+    def create(self, dto: CreatePerfilDTO) -> PerfilResponseDTO: # Crea un nuevo perfil
+        cuenta = self.cuenta_repo.find_by_id(dto.cuenta_id)     # Busca cuenta asociada
 
-    def create(self, dto: CreatePerfilDTO) -> PerfilResponseDTO:
-        """Crea un perfil y guarda avatar base64 si el frontend lo envia."""
-        cuenta = self.cuenta_repo.find_by_id(dto.cuenta_id)
-        if not cuenta:
+        if not cuenta:                                          # Valida existencia de cuenta
             raise NotFoundError("Cuenta no encontrada")
 
-        perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id)
-        max_perfiles = PLAN_LIMITS[cast(str, cuenta.plan)]
-        if len(perfiles) >= max_perfiles:
-            raise ConflictError("El plan no permite crear mas perfiles")
+        perfiles = self.perfil_repo.list_by_cuenta(dto.cuenta_id) # Obtiene perfiles actuales de la cuenta
+        max_perfiles = PLAN_LIMITS[cast(str, cuenta.plan)]       # Determina límite según plan de suscripción
 
-        repeated_name = any(perfil.nombre == dto.nombre for perfil in perfiles)
-        if repeated_name:
+        if len(perfiles) >= max_perfiles:                       # Valida límite de perfiles permitidos
+            raise ConflictError("El plan no permite crear más perfiles")
+
+        repeated_name = any(perfil.nombre == dto.nombre for perfil in perfiles) # Comprueba si el nombre ya existe
+
+        if repeated_name:                                       # Evita duplicidad de nombres en la cuenta
             raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
 
-        perfil = self.perfil_repo.create(
+        pin_hash = hash_password(dto.pin) if dto.pin else None
+
+        perfil = self.perfil_repo.create(                       # Persiste el nuevo perfil
             cuenta_id=dto.cuenta_id,
             nombre=dto.nombre,
-            pin=hash_password(dto.pin) if dto.pin else None,
+            pin=pin_hash,
             es_infantil=dto.es_infantil,
             avatar=None,
         )
@@ -133,29 +139,30 @@ class PerfilService:
                 avatar = self._store_avatar(dto.avatar, dto.cuenta_id, perfil.id, dto.nombre)
                 perfil = self.perfil_repo.update(perfil.id, avatar=avatar) or perfil
             except Exception:
-                # Si falla el upload de avatar, se deshace el perfil para no dejar datos a medias.
                 self.perfil_repo.delete(perfil.id)
                 raise
 
-        return to_perfil_response(perfil)
+        return to_perfil_response(perfil)                       # Retorna respuesta mapeada
 
-    def get_by_id(self, perfil_id: int) -> PerfilResponseDTO:
-        """Obtiene un perfil por ID."""
-        perfil = self.perfil_repo.find_by_id(perfil_id)
-        if not perfil:
+    def get_by_id(self, perfil_id: int) -> PerfilResponseDTO:   # Busca perfil por ID
+        perfil = self.perfil_repo.find_by_id(perfil_id)         # Consulta repositorio
+
+        if not perfil:                                          # Valida existencia
             raise NotFoundError("Perfil no encontrado")
-        return to_perfil_response(perfil)
 
-    def list_by_cuenta(self, cuenta_id: int) -> list[PerfilResponseDTO]:
-        """Lista perfiles de una cuenta existente."""
-        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
-        if not cuenta:
+        return to_perfil_response(perfil)                       # Retorna respuesta mapeada
+
+    def list_by_cuenta(self, cuenta_id: int) -> list[PerfilResponseDTO]: # Lista perfiles de una cuenta
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)         # Verifica cuenta antes de listar
+
+        if not cuenta:                                          # Si la cuenta no existe
             raise NotFoundError("Cuenta no encontrada")
-        return to_perfil_response_list(self.perfil_repo.list_by_cuenta(cuenta_id))
 
-    def update(self, perfil_id: int, dto: UpdatePerfilDTO) -> PerfilResponseDTO:
-        """Actualiza perfil y reemplaza avatar almacenado cuando llega uno nuevo."""
-        fields = dto.model_dump(exclude_unset=True)
+        perfiles = self.perfil_repo.list_by_cuenta(cuenta_id)   # Obtiene lista de perfiles
+        return to_perfil_response_list(perfiles)                # Retorna lista mapeada
+
+    def update(self, perfil_id: int, dto: UpdatePerfilDTO) -> PerfilResponseDTO: # Actualiza datos del perfil
+        fields = dto.model_dump(exclude_unset=True)             # Filtra solo campos proporcionados
 
         perfil_actual = self.perfil_repo.find_by_id(perfil_id)
         if not perfil_actual:
@@ -186,13 +193,14 @@ class PerfilService:
             elif avatar is None:
                 self._delete_stored_avatar(perfil_actual.avatar)
 
-        perfil = self.perfil_repo.update(perfil_id, **fields)
-        if not perfil:
+        perfil = self.perfil_repo.update(perfil_id, **fields)   # Aplica cambios
+
+        if not perfil:                                          # Valida existencia
             raise NotFoundError("Perfil no encontrado")
-        return to_perfil_response(perfil)
+
+        return to_perfil_response(perfil)                       # Retorna perfil actualizado
 
     def delete(self, perfil_id: int) -> None:
-        """Elimina un perfil y los assets cargados para ese perfil."""
         perfil = self.perfil_repo.find_by_id(perfil_id)
         if not perfil:
             raise NotFoundError("Perfil no encontrado")
@@ -200,11 +208,12 @@ class PerfilService:
         StorageService().delete_prefix(
             f"{settings.S3_ASSETS_PREFIX.strip('/')}/cuentas/{perfil.cuenta_id}/perfiles/{perfil_id}"
         )
-        if not self.perfil_repo.delete(perfil_id):
+        deleted = self.perfil_repo.delete(perfil_id)
+
+        if not deleted:
             raise NotFoundError("Perfil no encontrado")
 
     def _store_avatar(self, avatar: str, cuenta_id: int, perfil_id: int, profile_name: str) -> str:
-        """Acepta URLs existentes o data URLs nuevas enviadas desde el frontend."""
         if not self._is_data_url(avatar):
             return avatar
 
@@ -217,10 +226,8 @@ class PerfilService:
         return upload.object_key
 
     def _delete_stored_avatar(self, avatar: str | None) -> None:
-        """Borra solo avatares administrados por nuestro bucket de assets."""
         if avatar and avatar.startswith(f"{settings.S3_ASSETS_PREFIX.strip('/')}/"):
             StorageService().delete_object(avatar)
 
     def _is_data_url(self, value: str) -> bool:
-        """Detecta imagenes embebidas del canvas/file picker del frontend."""
         return value.startswith("data:")

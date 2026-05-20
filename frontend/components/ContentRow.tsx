@@ -43,20 +43,20 @@ export function ContentRow({
         </h2>
       </div>
 
-      <div className="relative group/row">
+      <div className="relative group">
         {/* Scroll buttons */}
         {!loading && contents.length > 4 && (
           <>
             <button
               onClick={() => scroll("left")}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 rounded-full flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-background"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
               aria-label="Desplazar a la izquierda"
             >
               <ChevronLeft size={24} className="text-foreground" />
             </button>
             <button
               onClick={() => scroll("right")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 rounded-full flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-background"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
               aria-label="Desplazar a la derecha"
             >
               <ChevronRight size={24} className="text-foreground" />
