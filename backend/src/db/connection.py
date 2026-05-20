@@ -153,12 +153,15 @@ def ensure_video_variant_quality_values():
         return
 
     with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(text("ALTER TABLE video_variants DROP CONSTRAINT IF EXISTS ck_video_variant_quality"))
+
         connection.execute(text("UPDATE video_variants SET quality = 'FHD' WHERE quality = 'HD'"))
         connection.execute(text("UPDATE video_variants SET quality = 'QHD' WHERE quality = '1440p'"))
+
         if engine.dialect.name != "postgresql":
             return
 
-        connection.execute(text("ALTER TABLE video_variants DROP CONSTRAINT IF EXISTS ck_video_variant_quality"))
         connection.execute(
             text(
                 "ALTER TABLE video_variants "

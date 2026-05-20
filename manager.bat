@@ -34,39 +34,89 @@ if "%option%"=="0" goto end
 goto menu
 
 :start
+call :ensure_env
+if errorlevel 1 (
+    pause
+    goto menu
+)
 call :write_host_ip
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose up -d
 pause
 goto menu
 
 :status
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose ps
 pause
 goto menu
 
 :logs_frontend
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose logs -f frontend
 goto menu
 
 :logs_backend
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose logs -f backend
 goto menu
 
 :logs_postgres
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose logs -f postgres
 goto menu
 
 :logs_minio
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose logs -f minio
 goto menu
 
 :stop
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose down
 pause
 goto menu
 
 :rebuild
+call :ensure_env
+if errorlevel 1 (
+    pause
+    goto menu
+)
 call :write_host_ip
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 docker compose down --remove-orphans
 docker compose build --no-cache frontend backend
 docker compose up -d --force-recreate
@@ -74,6 +124,16 @@ pause
 goto menu
 
 :reset_db
+call :ensure_env
+if errorlevel 1 (
+    pause
+    goto menu
+)
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
 echo.
 echo Esto elimina y vuelve a crear todas las tablas de Postgres.
 echo Tambien elimina y recrea el bucket titoflix-media de MinIO.
@@ -84,6 +144,59 @@ docker compose run --rm --entrypoint /bin/sh minio-init -c "until mc alias set l
 pause
 goto menu
 
+<<<<<<< Updated upstream
+=======
+:start_tunnel
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
+docker rm -f titoflix-cloudflared-tunnel >nul 2>nul
+docker run -d --name titoflix-cloudflared-tunnel cloudflare/cloudflared:latest tunnel --url http://host.docker.internal:3000
+echo.
+echo Espera unos segundos. La URL aparece abajo como https://...trycloudflare.com
+timeout /t 6 /nobreak >nul
+docker logs titoflix-cloudflared-tunnel
+pause
+goto menu
+
+:tunnel_logs
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
+docker logs titoflix-cloudflared-tunnel
+pause
+goto menu
+
+:stop_tunnel
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
+docker rm -f titoflix-cloudflared-tunnel
+pause
+goto menu
+
+:ensure_env
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (!(Test-Path '.env') -or -not (Select-String -Path '.env' -Pattern '^DATABASE_URL=' -Quiet)) { if (Test-Path '.env.example') { Copy-Item '.env.example' '.env' -Force; Write-Host 'Se creo/actualizo .env desde .env.example porque faltaban variables base.' } else { Write-Error 'No se encontro .env.example para crear .env.'; exit 1 } }"
+goto :eof
+
+:check_docker
+docker info >nul 2>nul
+if errorlevel 1 (
+    echo.
+    echo Docker no esta disponible.
+    echo Abri Docker Desktop y espera a que diga "Docker Desktop is running".
+    echo Si ya esta abierto, revisa que este usando el engine Linux de Docker Desktop.
+    exit /b 1
+)
+goto :eof
+
+>>>>>>> Stashed changes
 :write_host_ip
 set "HOST_IP=127.0.0.1"
 for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"
