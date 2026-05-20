@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Crown, Loader2, LogOut, Menu, Plus, Search, Settings, User, X } from "lucide-react";
+import { Check, Crown, Loader2, LogOut, Menu, Plus, Search, Settings, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
+import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
 import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -646,22 +647,3 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function ProfileAvatar({
-  profile,
-  size = "md",
-}: {
-  profile: { nombre: string; avatar?: string | null } | null;
-  size?: "sm" | "md";
-}) {
-  const sizeClass = size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-base";
-  return (
-    <span
-      className={`flex items-center justify-center rounded-md font-bold text-white ${sizeClass}`}
-      style={{
-        background: `linear-gradient(135deg, #009246 0%, #009246 33%, #ffffff 33%, #ffffff 66%, #ce2b37 66%, #ce2b37 100%)`,
-      }}
-    >
-      {(profile?.nombre?.charAt(0) || "?").toUpperCase()}
-    </span>
-  );
-}

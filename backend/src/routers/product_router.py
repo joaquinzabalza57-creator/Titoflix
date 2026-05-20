@@ -526,6 +526,15 @@ def continuar_viendo(
     return VistaService(db).continuar_viendo(profile.id)
 
 
+@router.get("/perfiles/{perfil_id}/recomendaciones", response_model=list[ContenidoResponseDTO])
+def recomendaciones(
+    perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
+    db: Session = Depends(get_db),
+):
+    return ContenidoService(db).recommendations(profile.id)
+
+
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,

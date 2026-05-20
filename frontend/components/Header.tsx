@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, User, X } from "lucide-react";
+import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
+import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
 import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import type { AuthAccount, Profile } from "@/lib/types";
@@ -598,18 +599,3 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function ProfileAvatar({ profile, size }: { profile?: { nombre: string; avatar?: string | null } | null; size: "sm" | "lg" }) {
-  const className = size === "sm" ? "h-8 w-8 text-sm" : "h-24 w-24 text-3xl";
-  const avatarUrl = getAssetUrl(profile?.avatar);
-  return (
-    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded bg-secondary font-bold text-foreground ${className}`}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-      ) : profile?.nombre ? (
-        profile.nombre.charAt(0).toUpperCase()
-      ) : (
-        <User size={18} />
-      )}
-    </span>
-  );
-}

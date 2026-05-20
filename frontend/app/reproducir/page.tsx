@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -11,7 +11,7 @@ const REPORT_INTERVAL_SECONDS = 5;
 // Threshold to mark as terminado (90%)
 const TERMINADO_THRESHOLD = 0.9;
 
-export default function ReproducirPage() {
+function ReproducirContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, profile, account } = useAuth();
@@ -171,5 +171,19 @@ export default function ReproducirPage() {
         Tu navegador no soporta la reproduccion de video.
       </video>
     </div>
+  );
+}
+
+export default function ReproducirPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <ReproducirContent />
+    </Suspense>
   );
 }

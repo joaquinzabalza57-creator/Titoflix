@@ -149,6 +149,47 @@ class ContenidoRepository:
             .all()
         )
 
+    def recommendations_for_profile(
+        self,
+        perfil_id: int,
+        limit: int = 10,
+        only_atp: bool = False,
+    ) -> list[Contenido]:
+        vistas = (
+            self.db.query(Vista)
+            .filter(Vista.perfil_id == perfil_id)
+            .order_by(Vista.fecha.desc())
+            .all()
+        )
+        watched_ids: set[int] = set()
+        genre_ids: set[int] = set()
+
+        for vista in vistas:
+            contenido = vista.contenido
+            if vista.episodio and vista.episodio.temporada:
+                contenido = vista.episodio.temporada.contenido
+            if not contenido:
+                continue
+            watched_ids.add(contenido.id)
+            genre_ids.update(genero.id for genero in contenido.generos)
+
+        query = self.db.query(Contenido)
+        if only_atp:
+            query = query.filter(Contenido.clasificacion_edad == "ATP")
+
+        if genre_ids:
+            query = query.join(Contenido.generos).filter(Genero.id.in_(genre_ids))
+            if watched_ids:
+                query = query.filter(~Contenido.id.in_(watched_ids))
+            return (
+                query.distinct()
+                .order_by(Contenido.titulo.asc())
+                .limit(limit)
+                .all()
+            )
+
+        return query.order_by(Contenido.titulo.asc()).limit(limit).all()
+
     def update(self, contenido_id: int, **fields) -> Contenido | None:
         generos_ids = fields.pop("generos_ids", None)
         contenido = self.find_by_id(contenido_id)

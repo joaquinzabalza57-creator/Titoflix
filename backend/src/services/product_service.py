@@ -277,6 +277,18 @@ class ContenidoService:
         contenidos = self.contenido_repo.top(limit=10, genero=genero)
         return to_contenido_response_list(contenidos)
 
+    def recommendations(self, perfil_id: int) -> list[ContenidoResponseDTO]:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        contenidos = self.contenido_repo.recommendations_for_profile(
+            perfil_id=perfil_id,
+            limit=10,
+            only_atp=perfil.es_infantil,
+        )
+        return to_contenido_response_list(contenidos)
+
     def get_video_source(self, contenido_id: int, quality: str | None = None) -> VideoSourceDTO:
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:

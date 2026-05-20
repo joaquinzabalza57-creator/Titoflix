@@ -68,8 +68,17 @@ goto menu
 :rebuild
 call :write_host_ip
 docker compose down --remove-orphans
+if errorlevel 1 goto rebuild_failed
 docker compose build --no-cache frontend backend
+if errorlevel 1 goto rebuild_failed
 docker compose up -d --force-recreate
+if errorlevel 1 goto rebuild_failed
+pause
+goto menu
+
+:rebuild_failed
+echo.
+echo No se pudo reconstruir o iniciar Titoflix. Revisa el error anterior.
 pause
 goto menu
 
@@ -85,9 +94,7 @@ pause
 goto menu
 
 :write_host_ip
-set "HOST_IP=127.0.0.1"
-for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.0\.0\.1|169\.254\.)' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -ExpandProperty IPAddress -First 1"`) do set "HOST_IP=%%I"
-powershell -NoProfile -Command "if (Test-Path '.env') { $c=Get-Content '.env'; if ($c -match '^HOST_IP=') { $c = $c -replace '^HOST_IP=.*','HOST_IP=%HOST_IP%'; $c | Set-Content '.env' } else { Add-Content '.env' 'HOST_IP=%HOST_IP%' } } else { Set-Content '.env' 'HOST_IP=%HOST_IP%' }"
+powershell -NoProfile -Command "$hostIp='127.0.0.1'; foreach ($ip in Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue) { if ($ip.IPAddress -notlike '127.*' -and $ip.IPAddress -notlike '169.254.*' -and $ip.InterfaceOperationalStatus -eq 'Up') { $hostIp=$ip.IPAddress; break } }; if (Test-Path '.env') { $c=Get-Content '.env'; if ($c -match '^HOST_IP=') { $c = $c -replace '^HOST_IP=.*',('HOST_IP=' + $hostIp); Set-Content -Path '.env' -Value $c } else { Add-Content -Path '.env' -Value ('HOST_IP=' + $hostIp) } } else { Set-Content -Path '.env' -Value ('HOST_IP=' + $hostIp) }"
 goto :eof
 
 :end
