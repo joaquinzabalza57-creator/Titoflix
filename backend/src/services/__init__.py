@@ -1,29 +1,27 @@
-"""Barrel de servicios de negocio usados por routers."""
-
-from src.services.auth_service import AuthService
-from src.services.product_service import (
-    CalificacionService,
-    ContenidoService,
-    EpisodioService,
-    GeneroService,
-    MiListaService,
-    ReporteService,
-    TemporadaService,
-    VistaService,
+from src.services.auth_service import AuthService             # Servicio de autenticación
+from src.services.product_service import (                    # Servicios de productos
+    CalificacionService,                                      # Servicio de calificaciones
+    ContenidoService,                                         # Servicio de contenidos
+    EpisodioService,                                          # Servicio de episodios
+    GeneroService,                                            # Servicio de géneros
+    MiListaService,                                           # Servicio de "Mi lista"
+    TemporadaService,                                         # Servicio de temporadas
+    VistaService,                                             # Servicio de historial de vistas
 )
-from src.services.user_service import CuentaService, PerfilService
-
+from src.services.user_service import (                       # Servicios de usuario
+    CuentaService,                                            # Servicio de cuentas
+    PerfilService,                                            # Servicio de perfiles
+)
 
 __all__ = [
-    "AuthService",
-    "CuentaService",
-    "PerfilService",
-    "GeneroService",
-    "ContenidoService",
-    "TemporadaService",
-    "EpisodioService",
-    "VistaService",
-    "MiListaService",
-    "ReporteService",
-    "CalificacionService",
+    "AuthService",                                            # Exporta servicio de autenticación
+    "CuentaService",                                          # Exporta servicio de cuentas
+    "PerfilService",                                          # Exporta servicio de perfiles
+    "GeneroService",                                          # Exporta servicio de géneros
+    "ContenidoService",                                       # Exporta servicio de contenidos
+    "TemporadaService",                                       # Exporta servicio de temporadas
+    "EpisodioService",                                        # Exporta servicio de episodios
+    "VistaService",                                           # Exporta servicio de vistas
+    "MiListaService",                                         # Exporta servicio de mi lista
+    "CalificacionService",                                    # Exporta servicio de calificaciones
 ]

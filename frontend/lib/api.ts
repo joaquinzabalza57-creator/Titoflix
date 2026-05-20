@@ -1,26 +1,22 @@
-// Cliente HTTP compartido por todo el frontend. Centraliza URLs, auth headers,
-// errores del backend y adaptacion de assets privados servidos desde /api/v1.
+// API configuration and utility functions for TITOFLIX
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "/api/v1";
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
-// Max upload size para assets chicos. Videos se validan/procesan en backend.
-export const MAX_UPLOAD_SIZE = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 10 * 1024 * 1024;
+// Max upload size (bytes). Can be overridden at build time with NEXT_PUBLIC_MAX_UPLOAD_SIZE.
+export const MAX_UPLOAD_SIZE = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 10 * 1024 * 1024; // 10MB
 
 export function getApiUrl(path: string): string {
-  // Ruta normal: usa proxy/rewrite de Next o una URL publica configurada.
   return `${API_BASE_URL}${path}`;
 }
 
 export function getDirectApiUrl(path: string): string {
-  // Ruta directa al backend, util cuando se evita el proxy del frontend.
   return `${DIRECT_API_BASE_URL}${path}`;
 }
 
 export function getBackendUrl(path: string): string {
-  // Los endpoints /playback devuelven URLs relativas de stream; aca se vuelven
-  // absolutas cuando el navegador necesita hablar directo con FastAPI.
+  // Handle relative stream URLs
   if (path.startsWith("http")) {
     return path;
   }
@@ -28,7 +24,6 @@ export function getBackendUrl(path: string): string {
 }
 
 export function getAssetUrl(path: string | null | undefined): string | null {
-  // MinIO nunca se expone directo al navegador: assets/* se sirven por backend.
   if (!path) {
     return null;
   }
@@ -42,7 +37,6 @@ export function getAssetUrl(path: string | null | undefined): string | null {
 }
 
 export function getAuthHeaders(): HeadersInit {
-  // El token vive en localStorage porque esta app es client-side.
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("titoflix_token");
   if (!token) return {};
@@ -55,8 +49,6 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  // Wrapper unico para fetch: agrega Authorization, JSON headers y parsing de
-  // errores con el formato que devuelve app_error_handler.
   const isFormData = options.body instanceof FormData;
   const url = getApiUrl(path);
   const hasBody = options.body !== undefined && options.body !== null;
@@ -69,15 +61,14 @@ export async function apiRequest<T>(
     (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
-  // Check cliente para evitar subir assets chicos demasiado grandes. Videos se
-  // validan en backend/proceso porque pueden superar este limite.
+  // Client-side check to avoid sending bodies larger than MAX_UPLOAD_SIZE.
   if (hasBody) {
     try {
       let bodySize = 0;
       if (isFormData && typeof FormData !== "undefined") {
         const fd = options.body as FormData;
         for (const entry of fd.entries()) {
-          const value = entry[1];
+          const value = entry[1] as any;
           if (typeof File !== "undefined" && value instanceof File) {
             bodySize += value.size || 0;
           } else if (typeof value === "string") {
@@ -87,8 +78,9 @@ export async function apiRequest<T>(
       } else if (typeof options.body === "string") {
         bodySize = new Blob([options.body]).size;
       } else if (typeof options.body === "object") {
+        // Fallback for objects that weren't stringified by the caller.
         try {
-          const text = JSON.stringify(options.body);
+          const text = JSON.stringify(options.body as any);
           bodySize = new Blob([text]).size;
         } catch {}
       }
@@ -96,7 +88,7 @@ export async function apiRequest<T>(
       if (bodySize > MAX_UPLOAD_SIZE) {
         const actualMB = Math.round((bodySize / 1024 / 1024) * 10) / 10;
         const allowedMB = Math.round((MAX_UPLOAD_SIZE / 1024 / 1024) * 10) / 10;
-        throw new Error(`El archivo es demasiado grande (${actualMB}MB). Tamano maximo permitido: ${allowedMB}MB.`);
+        throw new Error(`El archivo es demasiado grande (${actualMB}MB). Tamaño máximo permitido: ${allowedMB}MB.`);
       }
     } catch (err) {
       if (err instanceof Error) throw err;
@@ -110,7 +102,7 @@ export async function apiRequest<T>(
       headers,
     });
   } catch {
-    throw new Error("No se pudo conectar con el backend. Verifica que Docker este corriendo y que la app este configurada para usar la IP del servidor.");
+    throw new Error("No se pudo conectar con el backend. Verifica que Docker esté corriendo y que la app esté configurada para usar la IP del servidor.");
   }
 
   if (!response.ok) {
@@ -139,7 +131,7 @@ export async function apiRequest<T>(
   return response.json();
 }
 
-// Registro de cuentas publicas.
+// Registration
 export async function register(email: string, password: string, plan: "basico" | "estandar" | "premium"): Promise<void> {
   await apiRequest("/cuentas/", {
     method: "POST",
@@ -147,11 +139,10 @@ export async function register(email: string, password: string, plan: "basico" |
   });
 }
 
-// Estado de cuenta autenticada guardado en el navegador.
+// Auth
 export type StoredAccount = {
   id?: number;
   email: string;
-  plan?: "basico" | "estandar" | "premium";
   is_admin: boolean;
 };
 
@@ -187,7 +178,7 @@ export function removeStoredAccount(): void {
   localStorage.removeItem("titoflix_account");
 }
 
-// Perfil actualmente elegido por la cuenta.
+// Profile
 export type StoredProfile = {
   id: number;
   nombre: string;
@@ -209,13 +200,13 @@ export function removeSelectedProfile(): void {
 }
 
 export function logout(): void {
-  // Limpia cuenta, token y perfil para volver al flujo de login.
   removeToken();
   removeStoredAccount();
   removeSelectedProfile();
 }
 
-// HU5: busqueda de contenido con filtros.
+// ─── HU5: Content search with filters ───────────────────────────────────────
+
 export interface ContentSearchParams {
   q?: string;
   genero?: string;
@@ -225,7 +216,6 @@ export interface ContentSearchParams {
 }
 
 export function buildContentSearchUrl(params: ContentSearchParams): string {
-  // Mantiene sincronizado el contrato de query params con product_router.search.
   const query = new URLSearchParams();
   if (params.q) query.set("q", params.q);
   if (params.genero) query.set("genero", params.genero);
@@ -236,7 +226,8 @@ export function buildContentSearchUrl(params: ContentSearchParams): string {
   return qs ? `/contenidos?${qs}` : "/contenidos";
 }
 
-// HU6: progreso de reproduccion.
+// ─── HU6: View progress ──────────────────────────────────────────────────────
+
 export interface ReportVistaPayload {
   contenido_id?: number;
   episodio_id?: number;
@@ -245,25 +236,19 @@ export interface ReportVistaPayload {
 }
 
 export async function reportarVista(perfilId: number, payload: ReportVistaPayload): Promise<void> {
-  // El reproductor llama esto periodicamente para alimentar Continuar viendo.
   await apiRequest(`/perfiles/${perfilId}/vistas`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
+// ─── HU9: Calificaciones ─────────────────────────────────────────────────────
+
 export interface Calificacion {
   id: number;
   perfil_id: number;
   contenido_id: number;
   puntaje: number;
-}
-
-export async function setCalificacion(perfilId: number, contenidoId: number, puntaje: number): Promise<Calificacion> {
-  return apiRequest<Calificacion>(`/perfiles/${perfilId}/calificaciones/${contenidoId}`, {
-    method: "POST",
-    body: JSON.stringify({ puntaje }),
-  });
 }
 
 export async function getCalificacion(perfilId: number, contenidoId: number): Promise<Calificacion | null> {
@@ -274,35 +259,63 @@ export async function getCalificacion(perfilId: number, contenidoId: number): Pr
   }
 }
 
-export async function deleteCalificacion(perfilId: number, contenidoId: number): Promise<void> {
-  await apiRequest(`/perfiles/${perfilId}/calificaciones/${contenidoId}`, {
-    method: "DELETE",
+export async function setCalificacion(perfilId: number, contenidoId: number, puntaje: number): Promise<Calificacion> {
+  return await apiRequest<Calificacion>(`/perfiles/${perfilId}/calificaciones`, {
+    method: "POST",
+    body: JSON.stringify({ contenido_id: contenidoId, puntaje }),
   });
 }
+
+// ─── HU10: Recomendaciones ───────────────────────────────────────────────────
 
 export async function getRecomendaciones(perfilId: number): Promise<import("@/lib/types").Contenido[]> {
-  return apiRequest<import("@/lib/types").Contenido[]>(`/perfiles/${perfilId}/recomendaciones`);
+  return await apiRequest<import("@/lib/types").Contenido[]>(`/perfiles/${perfilId}/recomendaciones`);
 }
 
-export async function downloadFromApi(path: string, fallbackFilename: string): Promise<void> {
-  const response = await fetch(getApiUrl(path), {
-    headers: getAuthHeaders(),
+export async function getTopContenidos(genero?: string): Promise<import("@/lib/types").Contenido[]> {
+  const path = genero ? `/contenidos/top?genero=${encodeURIComponent(genero)}` : "/contenidos/top";
+  return await apiRequest<import("@/lib/types").Contenido[]>(path);
+}
+
+// ─── HU11: Control parental PIN ──────────────────────────────────────────────
+
+export async function desbloquearPerfil(perfilId: number, pin: string): Promise<{ success: boolean; bloqueado_hasta?: string }> {
+  return await apiRequest<{ success: boolean; bloqueado_hasta?: string }>(`/perfiles/${perfilId}/desbloquear`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
   });
+}
 
-  if (!response.ok) {
-    throw new Error(`Error ${response.status}`);
-  }
+export async function setPinCuenta(cuentaId: number, pin: string): Promise<void> {
+  await apiRequest(`/cuentas/${cuentaId}/pin`, {
+    method: "PUT",
+    body: JSON.stringify({ pin }),
+  });
+}
 
-  const blob = await response.blob();
-  const disposition = response.headers.get("content-disposition") || "";
-  const match = disposition.match(/filename="?([^"]+)"?/i);
-  const filename = match?.[1] || fallbackFilename;
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(objectUrl);
+export async function getCuentaInfo(cuentaId: number): Promise<{ has_pin: boolean; plan: string }> {
+  return await apiRequest<{ has_pin: boolean; plan: string }>(`/cuentas/${cuentaId}`);
+}
+
+// ─── HU14: Reporte de visualizacion ──────────────────────────────────────────
+
+export interface ReporteVisualizacionItem {
+  contenido_id: number;
+  titulo: string;
+  tipo: "pelicula" | "serie";
+  minutos_vistos: number;
+  generos: string[];
+}
+
+export interface ReporteVisualizacion {
+  anio: number;
+  mes: number;
+  total_minutos: number;
+  total_contenidos: number;
+  por_genero: Record<string, number>;
+  contenidos: ReporteVisualizacionItem[];
+}
+
+export async function getReporteVisualizacion(anio: number, mes: number): Promise<ReporteVisualizacion> {
+  return await apiRequest<ReporteVisualizacion>(`/reportes/visualizacion?anio=${anio}&mes=${mes}`);
 }

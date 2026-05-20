@@ -22,14 +22,11 @@ def get_db():
 def create_tables():
     """Crea todas las tablas en la BD y agrega columnas nuevas en bases existentes."""
     Base.metadata.create_all(bind=engine)
-    # Migraciones livianas para bases locales antiguas sin incorporar Alembic.
     ensure_account_admin_column()
-    ensure_profile_pin_lock_columns()
     ensure_storage_media_columns()
     ensure_asset_media_columns()
     ensure_duration_columns_are_float()
     ensure_video_variant_quality_values()
-    ensure_child_profiles_have_no_pin()
     ensure_default_admin_account()
     print("Tablas creadas exitosamente")
 
@@ -48,27 +45,6 @@ def ensure_account_admin_column():
         connection.execute(
             text("ALTER TABLE cuentas ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE")
         )
-
-
-def ensure_profile_pin_lock_columns():
-    """Agrega estado persistido para bloqueo de PIN en perfiles existentes."""
-    inspector = inspect(engine)
-    if not inspector.has_table("perfiles"):
-        return
-
-    column_names = {column["name"] for column in inspector.get_columns("perfiles")}
-    statements = []
-    if "pin_failed_attempts" not in column_names:
-        statements.append("ALTER TABLE perfiles ADD COLUMN pin_failed_attempts INTEGER NOT NULL DEFAULT 0")
-    if "pin_locked_until" not in column_names:
-        statements.append("ALTER TABLE perfiles ADD COLUMN pin_locked_until TIMESTAMP")
-
-    if not statements:
-        return
-
-    with engine.begin() as connection:
-        for statement in statements:
-            connection.execute(text(statement))
 
 
 def ensure_storage_media_columns():
@@ -177,15 +153,12 @@ def ensure_video_variant_quality_values():
         return
 
     with engine.begin() as connection:
-        if engine.dialect.name == "postgresql":
-            connection.execute(text("ALTER TABLE video_variants DROP CONSTRAINT IF EXISTS ck_video_variant_quality"))
-
         connection.execute(text("UPDATE video_variants SET quality = 'FHD' WHERE quality = 'HD'"))
         connection.execute(text("UPDATE video_variants SET quality = 'QHD' WHERE quality = '1440p'"))
-
         if engine.dialect.name != "postgresql":
             return
 
+        connection.execute(text("ALTER TABLE video_variants DROP CONSTRAINT IF EXISTS ck_video_variant_quality"))
         connection.execute(
             text(
                 "ALTER TABLE video_variants "
@@ -193,22 +166,6 @@ def ensure_video_variant_quality_values():
                 "CHECK (quality IN ('FHD', 'QHD', '4K'))"
             )
         )
-
-
-def ensure_child_profiles_have_no_pin():
-    """Asegura que los perfiles infantiles existentes no queden protegidos por PIN."""
-    inspector = inspect(engine)
-    if not inspector.has_table("perfiles"):
-        return
-
-    column_names = {column["name"] for column in inspector.get_columns("perfiles")}
-    if not {"es_infantil", "pin"}.issubset(column_names):
-        return
-
-    reset_attempts = ", pin_failed_attempts = 0" if "pin_failed_attempts" in column_names else ""
-    reset_locked = ", pin_locked_until = NULL" if "pin_locked_until" in column_names else ""
-    with engine.begin() as connection:
-        connection.execute(text(f"UPDATE perfiles SET pin = NULL{reset_attempts}{reset_locked} WHERE es_infantil = TRUE"))
 
 
 def ensure_default_admin_account():
@@ -219,13 +176,13 @@ def ensure_default_admin_account():
 
     password_hash = hash_password(settings.ADMIN_PASSWORD)
     with engine.begin() as connection:
-        # El frontend/admin y la documentacion asumen una cuenta admin estable.
+        # Verificar si existe admin con ID 1
         existing = connection.execute(
             text("SELECT id FROM cuentas WHERE id = 1"),
         ).first()
 
         if existing:
-            # Si ya existe, se sincronizan credenciales y permisos desde `.env`.
+            # Solo actualizar contraseña si cambió
             connection.execute(
                 text(
                     "UPDATE cuentas "
@@ -240,13 +197,13 @@ def ensure_default_admin_account():
             )
             return
 
-        # Si existe con otro ID, se elimina para evitar duplicados del admin fijo.
+        # Si existe con otro ID, eliminarlo
         connection.execute(
             text("DELETE FROM cuentas WHERE email = :email"),
             {"email": settings.ADMIN_USERNAME},
         )
 
-        # Insertar con ID 1 explicitamente.
+        # Insertar con ID 1 explícitamente
         if engine.dialect.name == "postgresql":
             connection.execute(
                 text(
@@ -259,12 +216,12 @@ def ensure_default_admin_account():
                     "plan": "premium",
                 },
             )
-            # Resetear el sequence para que el siguiente insert use ID 2.
+            # Resetear el sequence para que el siguiente insert use ID 2
             connection.execute(
                 text("SELECT setval(pg_get_serial_sequence('cuentas', 'id'), 1)")
             )
         else:
-            # Para SQLite y otros dialects.
+            # Para SQLite y otros dialects
             connection.execute(
                 text(
                     "INSERT INTO cuentas (id, email, password_hash, plan, is_admin) "

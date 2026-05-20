@@ -9,7 +9,6 @@ interface VideoPlayerProps {
 }
 
 export function VideoPlayer({ streamUrl, title, onBack }: VideoPlayerProps) {
-  // Reproductor simple usado por flujos embebidos: recibe una URL ya firmada por /playback.
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header */}

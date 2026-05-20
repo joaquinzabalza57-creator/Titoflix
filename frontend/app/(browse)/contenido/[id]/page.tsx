@@ -3,21 +3,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Play, Plus, Check, Star, Loader2, Film, Tv, Download, X } from "lucide-react";
-import {
-  apiRequest,
-  deleteCalificacion,
-  downloadFromApi,
-  getCalificacion,
-  getBackendUrl,
-  getAssetUrl,
-  reportarVista,
-  setCalificacion,
-} from "@/lib/api";
+import { ArrowLeft, Play, Plus, Check, Star, Loader2, Film, Tv } from "lucide-react";
+import { apiRequest, getSelectedProfile, getBackendUrl, getAssetUrl, getCalificacion, setCalificacion } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
 import { StarRating } from "@/components/StarRating";
-import type { Contenido, Temporada, Episodio, PlaybackResponse, VideoVariant, Profile, ContinuarViendoItem } from "@/lib/types";
+import type { Contenido, Temporada, Episodio, PlaybackResponse, MiListaItem, VideoVariant, Profile, Vista } from "@/lib/types";
 
 export default function ContentDetailPage() {
   const params = useParams();
@@ -37,10 +28,11 @@ export default function ContentDetailPage() {
   const [selectedEpisodeQualities, setSelectedEpisodeQualities] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [currentProfileData, setCurrentProfileData] = useState<Profile | null>(null);
-  const [progressItems, setProgressItems] = useState<ContinuarViendoItem[]>([]);
-  const [rating, setRating] = useState(0);
+  
+  // HU9: Calificacion state
+  const [userRating, setUserRating] = useState<number>(0);
+  const [hasWatched, setHasWatched] = useState(false);
   const [ratingLoading, setRatingLoading] = useState(false);
-  const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
 
   // Auth check
   useEffect(() => {
@@ -121,66 +113,44 @@ export default function ContentDetailPage() {
   // Check if content is in Mi Lista
   useEffect(() => {
     if (profile && content) {
-      apiRequest<Contenido[]>(`/perfiles/${profile.id}/mi-lista`)
+      apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`)
         .then((data) => {
-          const found = data.some((item) => item.id === content.id);
+          const found = data.some((item) => item.contenido_id === content.id);
           setInMiLista(found);
         })
         .catch(() => {});
     }
   }, [content, profile]);
 
+  // HU9: Check if user has watched this content and load their rating
   useEffect(() => {
     if (!profile || !content) return;
-    apiRequest<ContinuarViendoItem[]>(`/perfiles/${profile.id}/continuar`)
-      .then((items) => {
-        setProgressItems(items.filter((item) => item.contenido?.id === content.id));
-      })
-      .catch(() => setProgressItems([]));
-  }, [content, profile]);
 
-  useEffect(() => {
-    if (!profile || !content) {
-      setRating(0);
-      return;
-    }
+    // Check if user has started watching
+    apiRequest<Vista[]>(`/perfiles/${profile.id}/vistas`)
+      .then((vistas) => {
+        const watched = vistas.some(
+          (v) => v.contenido_id === content.id || (content.tipo === "serie" && v.contenido_id === content.id)
+        );
+        setHasWatched(watched);
+      })
+      .catch(() => {});
+
+    // Load user's existing rating
     getCalificacion(profile.id, content.id)
-      .then((calificacion) => setRating(calificacion?.puntaje || 0))
-      .catch(() => setRating(0));
-  }, [content, profile]);
+      .then((cal) => {
+        if (cal) {
+          setUserRating(cal.puntaje);
+          setHasWatched(true); // If they rated, they must have watched
+        }
+      })
+      .catch(() => {});
+  }, [profile, content]);
 
   const movieQualities = qualityOptions(content?.video_variants);
   const portadaUrl = content ? getAssetUrl(content.portada_url) : null;
-  const averageRating = content?.promedio_calificaciones ?? content?.promedio_calificacion ?? null;
 
-  const movieProgress = progressItems.find((item) => !item.episodio && item.contenido.id === content?.id);
-
-  const buildPlayerUrl = ({
-    streamUrl,
-    title,
-    contenidoId,
-    episodioId,
-    start = 0,
-  }: {
-    streamUrl: string;
-    title: string;
-    contenidoId: number;
-    episodioId?: number;
-    start?: number;
-  }) => {
-    const params = new URLSearchParams({
-      url: streamUrl,
-      title,
-      contenido_id: String(contenidoId),
-      start: String(Math.max(0, Math.floor(start))),
-    });
-    if (episodioId) {
-      params.set("episodio_id", String(episodioId));
-    }
-    return `/reproducir?${params.toString()}`;
-  };
-
-  const handlePlayMovie = async (mode: "continue" | "restart" = "continue") => {
+  const handlePlayMovie = async () => {
     if (!content) return;
 
     // HU4: Restriction check
@@ -197,19 +167,9 @@ export default function ContentDetailPage() {
         : `/contenidos/${content.id}/playback`;
       const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
-      if (mode === "restart" && profile?.id) {
-        await reportarVista(profile.id, {
-          contenido_id: content.id,
-          segundos_vistos: 0,
-          terminado: false,
-        }).catch(() => {});
-      }
-      router.push(buildPlayerUrl({
-        streamUrl,
-        title: content.titulo,
-        contenidoId: content.id,
-        start: mode === "continue" ? movieProgress?.segundos_vistos || 0 : 0,
-      }));
+      router.push(
+        `/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(content.titulo)}&contenido_id=${content.id}`
+      );
     } catch (err) {
       if (err instanceof Error && err.message.includes("403")) {
         setError("Este contenido no esta disponible para perfiles infantiles.");
@@ -221,10 +181,7 @@ export default function ContentDetailPage() {
     }
   };
 
-  const getEpisodeProgress = (episodioId: number) =>
-    progressItems.find((item) => item.episodio?.id === episodioId);
-
-  const handlePlayEpisode = async (episodio: Episodio, mode: "continue" | "restart" = "continue") => {
+  const handlePlayEpisode = async (episodio: Episodio) => {
     if (!content || !selectedTemporada) return;
 
     // HU4: Restriction check
@@ -243,21 +200,9 @@ export default function ContentDetailPage() {
       const data = await apiRequest<PlaybackResponse>(path);
       const streamUrl = getBackendUrl(data.stream_url);
       const title = `${content.titulo} - T${selectedTemporada.numero} E${episodio.numero}: ${episodio.titulo}`;
-      if (mode === "restart" && profile?.id) {
-        await reportarVista(profile.id, {
-          episodio_id: episodio.id,
-          segundos_vistos: 0,
-          terminado: false,
-        }).catch(() => {});
-      }
-      const progress = getEpisodeProgress(episodio.id);
-      router.push(buildPlayerUrl({
-        streamUrl,
-        title,
-        contenidoId: content.id,
-        episodioId: episodio.id,
-        start: mode === "continue" ? progress?.segundos_vistos || 0 : 0,
-      }));
+      router.push(
+        `/reproducir?url=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(title)}&episodio_id=${episodio.id}&contenido_id=${content.id}`
+      );
     } catch (err) {
       if (err instanceof Error && err.message.includes("403")) {
         setError("Este contenido no esta disponible para perfiles infantiles.");
@@ -291,73 +236,18 @@ export default function ContentDetailPage() {
     }
   };
 
-  const handleRate = async (puntaje: number) => {
-    if (!profile || !content) return;
+  // HU9: Handle rating change
+  const handleRatingChange = async (newRating: number) => {
+    if (!profile || !content || !hasWatched) return;
+    
     setRatingLoading(true);
-    setError(null);
     try {
-      await setCalificacion(profile.id, content.id, puntaje);
-      setRating(puntaje);
-      setContent((current) =>
-        current
-          ? {
-              ...current,
-              promedio_calificaciones: current.promedio_calificaciones ?? current.promedio_calificacion ?? puntaje,
-            }
-          : current
-      );
+      await setCalificacion(profile.id, content.id, newRating);
+      setUserRating(newRating);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la calificacion");
+      console.error("Error setting rating:", err);
     } finally {
       setRatingLoading(false);
-    }
-  };
-
-  const handleClearRating = async () => {
-    if (!profile || !content || rating === 0) return;
-    setRatingLoading(true);
-    setError(null);
-    try {
-      await deleteCalificacion(profile.id, content.id);
-      setRating(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo borrar la calificacion");
-    } finally {
-      setRatingLoading(false);
-    }
-  };
-
-  const handleDownloadMovie = async () => {
-    if (!content) return;
-    const quality = selectedMovieQuality || movieQualities[0] || "";
-    setDownloadLoading("movie");
-    setError(null);
-    try {
-      const path = quality
-        ? `/contenidos/${content.id}/download?quality=${encodeURIComponent(quality)}`
-        : `/contenidos/${content.id}/download`;
-      await downloadFromApi(path, safeVideoFilename(content.titulo));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo descargar el video");
-    } finally {
-      setDownloadLoading(null);
-    }
-  };
-
-  const handleDownloadEpisode = async (episodio: Episodio) => {
-    const qualities = qualityOptions(episodio.video_variants);
-    const quality = selectedEpisodeQualities[episodio.id] || qualities[0] || "";
-    setDownloadLoading(`ep-${episodio.id}`);
-    setError(null);
-    try {
-      const path = quality
-        ? `/episodios/${episodio.id}/download?quality=${encodeURIComponent(quality)}`
-        : `/episodios/${episodio.id}/download`;
-      await downloadFromApi(path, safeVideoFilename(episodio.titulo));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo descargar el episodio");
-    } finally {
-      setDownloadLoading(null);
     }
   };
 
@@ -383,15 +273,19 @@ export default function ContentDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero with poster/background */}
-      <div className="relative h-[50vh] md:h-[60vh]">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 p-4 bg-gradient-to-b from-background to-transparent">
         <Link
           href="/inicio"
-          className="absolute left-4 top-24 z-20 inline-flex items-center gap-2 rounded-md bg-background/70 px-3 py-2 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-background hover:text-primary md:left-8 lg:left-16"
+          className="inline-flex items-center gap-2 text-foreground hover:text-primary transition-colors"
         >
-          <ArrowLeft size={20} />
-          <span>Volver</span>
+          <ArrowLeft size={24} />
+          <span className="font-medium">Volver</span>
         </Link>
+      </header>
+
+      {/* Hero with poster/background */}
+      <div className="relative h-[50vh] md:h-[60vh]">
         {portadaUrl ? (
           <img
             src={portadaUrl}
@@ -442,10 +336,10 @@ export default function ContentDetailPage() {
           <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
             {content.tipo === "pelicula" ? "Pelicula" : "Serie"}
           </span>
-          {averageRating !== null && averageRating > 0 && (
+          {content.promedio_calificacion !== undefined && content.promedio_calificacion > 0 && (
             <span className="flex items-center gap-1 text-yellow-500">
               <Star size={14} fill="currentColor" />
-              {averageRating.toFixed(1)}
+              {content.promedio_calificacion.toFixed(1)}
             </span>
           )}
         </div>
@@ -471,12 +365,35 @@ export default function ContentDetailPage() {
           </p>
         )}
 
+        {/* HU9: User rating section */}
+        {hasWatched && !error && (
+          <div className="mb-6 p-4 bg-card rounded-lg border border-border">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-foreground">Tu calificacion:</span>
+              <div className="flex items-center gap-2">
+                <StarRating
+                  value={userRating}
+                  onChange={handleRatingChange}
+                  readOnly={ratingLoading}
+                  size={28}
+                />
+                {ratingLoading && <Loader2 size={16} className="animate-spin text-muted-foreground" />}
+              </div>
+            </div>
+            {userRating > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Has calificado este contenido con {userRating} estrella{userRating !== 1 ? "s" : ""}.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-wrap gap-3 mb-8">
           {content.tipo === "pelicula" && !error && (
             <>
               <button
-                onClick={() => handlePlayMovie("continue")}
+                onClick={handlePlayMovie}
                 disabled={playLoading === "movie"}
                 className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
@@ -485,17 +402,8 @@ export default function ContentDetailPage() {
                 ) : (
                   <Play size={20} fill="currentColor" />
                 )}
-                {movieProgress ? "Continuar" : "Reproducir"}
+                Reproducir
               </button>
-              {movieProgress && (
-                <button
-                  onClick={() => handlePlayMovie("restart")}
-                  disabled={playLoading === "movie"}
-                  className="flex items-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground font-semibold rounded-lg hover:bg-secondary/80 transition-colors border border-border disabled:opacity-50"
-                >
-                  Empezar desde cero
-                </button>
-              )}
               {movieQualities.length > 0 && (
                 <select
                   className="rounded-lg border border-border bg-secondary px-3 py-3 text-sm font-semibold text-secondary-foreground outline-none focus:ring-2 focus:ring-primary"
@@ -510,14 +418,6 @@ export default function ContentDetailPage() {
                   ))}
                 </select>
               )}
-              <button
-                onClick={handleDownloadMovie}
-                disabled={downloadLoading === "movie"}
-                className="flex items-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground font-semibold rounded-lg hover:bg-secondary/80 transition-colors border border-border disabled:opacity-50"
-              >
-                {downloadLoading === "movie" ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-                Descargar
-              </button>
             </>
           )}
           <button
@@ -534,23 +434,6 @@ export default function ContentDetailPage() {
             )}
             {inMiLista ? "En Mi lista" : "Mi lista"}
           </button>
-        </div>
-
-        <div className="mb-8 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-          <span className="text-sm font-medium text-foreground">Tu calificacion</span>
-          <StarRating value={rating} onChange={handleRate} label="Calificar contenido" />
-          {ratingLoading && <Loader2 size={18} className="animate-spin text-primary" />}
-          {rating > 0 && (
-            <button
-              type="button"
-              onClick={handleClearRating}
-              disabled={ratingLoading}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              <X size={14} />
-              Quitar
-            </button>
-          )}
         </div>
 
         {/* Series: Temporadas and Episodios */}
@@ -582,95 +465,68 @@ export default function ContentDetailPage() {
             {episodios.length > 0 ? (
               <div className="space-y-3">
                 <h3 className="text-xl font-semibold text-foreground mb-4">Episodios</h3>
-                {episodios.map((episodio) => {
-                  const episodeProgress = getEpisodeProgress(episodio.id);
-                  return (
-                    <div
-                      key={episodio.id}
-                      className="flex items-center justify-between gap-3 p-4 bg-card rounded-lg hover:bg-card/80 transition-colors"
-                    >
-                      {getAssetUrl(episodio.thumbnail_url) && (
-                        <img
-                          src={getAssetUrl(episodio.thumbnail_url) || ""}
-                          alt=""
-                          className="h-16 w-28 flex-shrink-0 rounded-md object-cover"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            E{episodio.numero}
-                          </span>
-                          <h4 className="font-medium text-foreground truncate">
-                            {episodio.titulo}
-                          </h4>
-                        </div>
-                        {episodio.descripcion && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {episodio.descripcion}
-                          </p>
-                        )}
+                {episodios.map((episodio) => (
+                  <div
+                    key={episodio.id}
+                    className="flex items-center justify-between gap-3 p-4 bg-card rounded-lg hover:bg-card/80 transition-colors"
+                  >
+                    {getAssetUrl(episodio.thumbnail_url) && (
+                      <img
+                        src={getAssetUrl(episodio.thumbnail_url) || ""}
+                        alt=""
+                        className="h-16 w-28 flex-shrink-0 rounded-md object-cover"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          E{episodio.numero}
+                        </span>
+                        <h4 className="font-medium text-foreground truncate">
+                          {episodio.titulo}
+                        </h4>
                       </div>
-                      {qualityOptions(episodio.video_variants).length > 0 && (
-                        <select
-                          className="rounded-md border border-border bg-background px-2 py-2 text-xs font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary"
-                          value={
-                            selectedEpisodeQualities[episodio.id] ||
-                            qualityOptions(episodio.video_variants)[0]
-                          }
-                          onChange={(event) =>
-                            setSelectedEpisodeQualities((current) => ({
-                              ...current,
-                              [episodio.id]: event.target.value,
-                            }))
-                          }
-                          aria-label={`Calidad de ${episodio.titulo}`}
-                        >
-                          {qualityOptions(episodio.video_variants).map((quality) => (
-                            <option key={quality} value={quality}>
-                              {quality}
-                            </option>
-                          ))}
-                        </select>
+                      {episodio.descripcion && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {episodio.descripcion}
+                        </p>
                       )}
-                      <div className="flex flex-shrink-0 items-center gap-2">
-                        {episodeProgress && (
-                          <button
-                            onClick={() => handlePlayEpisode(episodio, "restart")}
-                            disabled={playLoading === `ep-${episodio.id}`}
-                            className="rounded-md border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-                          >
-                            Desde cero
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handlePlayEpisode(episodio, "continue")}
-                          disabled={playLoading === `ep-${episodio.id}`}
-                          className="ml-2 flex h-10 flex-shrink-0 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                        >
-                          {playLoading === `ep-${episodio.id}` ? (
-                            <Loader2 size={20} className="animate-spin text-primary-foreground" />
-                          ) : (
-                            <Play size={18} fill="white" className="text-primary-foreground" />
-                          )}
-                          {episodeProgress ? "Continuar" : "Ver"}
-                        </button>
-                        <button
-                          onClick={() => handleDownloadEpisode(episodio)}
-                          disabled={downloadLoading === `ep-${episodio.id}`}
-                          className="flex h-10 flex-shrink-0 items-center gap-2 rounded-md border border-border bg-secondary px-3 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-                        >
-                          {downloadLoading === `ep-${episodio.id}` ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Download size={16} />
-                          )}
-                          Descargar
-                        </button>
-                      </div>
                     </div>
-                  );
-                })}
+                    {qualityOptions(episodio.video_variants).length > 0 && (
+                      <select
+                        className="rounded-md border border-border bg-background px-2 py-2 text-xs font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary"
+                        value={
+                          selectedEpisodeQualities[episodio.id] ||
+                          qualityOptions(episodio.video_variants)[0]
+                        }
+                        onChange={(event) =>
+                          setSelectedEpisodeQualities((current) => ({
+                            ...current,
+                            [episodio.id]: event.target.value,
+                          }))
+                        }
+                        aria-label={`Calidad de ${episodio.titulo}`}
+                      >
+                        {qualityOptions(episodio.video_variants).map((quality) => (
+                          <option key={quality} value={quality}>
+                            {quality}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => handlePlayEpisode(episodio)}
+                      disabled={playLoading === `ep-${episodio.id}`}
+                      className="ml-2 w-10 h-10 flex-shrink-0 bg-primary rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      {playLoading === `ep-${episodio.id}` ? (
+                        <Loader2 size={20} className="animate-spin text-primary-foreground" />
+                      ) : (
+                        <Play size={20} fill="white" className="text-primary-foreground ml-0.5" />
+                      )}
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : temporadas.length > 0 ? (
               <p className="text-muted-foreground text-center py-8">
@@ -696,12 +552,4 @@ function qualityOptions(variants: VideoVariant[] | undefined): string[] {
 
 function qualityRank(quality: string): number {
   return { FHD: 1, QHD: 2, "4K": 3 }[quality] || 0;
-}
-
-function safeVideoFilename(title: string): string {
-  const safeTitle = title
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `${safeTitle || "titoflix-video"}.mp4`;
 }

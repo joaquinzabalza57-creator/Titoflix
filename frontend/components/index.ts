@@ -1,7 +1,6 @@
 export { BrandLogo } from "./BrandLogo";
 export { LoginScreen } from "./LoginScreen";
 export { ProfileSelector } from "./ProfileSelector";
-export { ProfileAvatar } from "./ProfileAvatar";
 export { ProfileCreateScreen } from "./ProfileCreateScreen";
 export { Header } from "./Header";
 export { BrowseHeader } from "./BrowseHeader";
@@ -11,5 +10,5 @@ export { ContentRow } from "./ContentRow";
 export { ContentDetail } from "./ContentDetail";
 export { VideoPlayer } from "./VideoPlayer";
 export { ContinuarViendoRow } from "./ContinuarViendoRow";
-export { PinModal } from "./PinModal";
 export { StarRating } from "./StarRating";
+export { PinModal } from "./PinModal";

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Hero } from "@/components/Hero";
 import { ContentRow } from "@/components/ContentRow";
 import { ContinuarViendoRow } from "@/components/ContinuarViendoRow";
-import { apiRequest, getRecomendaciones, getSelectedProfile } from "@/lib/api";
-import type { Contenido, ContinuarViendoItem } from "@/lib/types";
+import { apiRequest, getSelectedProfile, getRecomendaciones, getTopContenidos } from "@/lib/api";
+import type { Contenido, MiListaItem, ContinuarViendoItem } from "@/lib/types";
 
 const mockContenidos: Contenido[] = [
   {
@@ -42,23 +42,25 @@ export default function InicioPage() {
       const contenidos = await apiRequest<Contenido[]>("/contenidos").catch(() => []);
       setAllContent(contenidos.length > 0 ? contenidos : mockContenidos);
 
-      const top = await apiRequest<Contenido[]>("/contenidos/top").catch(() => []);
+      // HU10: Get top 10 most watched content
+      const top = await getTopContenidos().catch(() => []);
       setTopContent(top);
 
       const profile = getSelectedProfile();
       if (profile && profile.id > 0) {
+        // HU10: Get personalized recommendations based on watched genres
         const recs = await getRecomendaciones(profile.id).catch(() => []);
         setRecomendaciones(recs);
 
         // HU8: mi lista
-        const lista = await apiRequest<Contenido[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
-        setMiLista(lista);
+        const lista = await apiRequest<MiListaItem[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
+        setMiLista(lista.filter((item) => item.contenido).map((item) => item.contenido as Contenido));
 
         // HU7: continuar viendo — returns up to 10 unfinished items, ordered by last watched
         const continuar = await apiRequest<ContinuarViendoItem[]>(
           `/perfiles/${profile.id}/continuar`
         ).catch(() => []);
-        setContinuarViendo(continuar.filter((item) => item.contenido));
+        setContinuarViendo(continuar);
       }
     } catch (error) {
       console.error("Error fetching content:", error);
@@ -85,22 +87,35 @@ export default function InicioPage() {
           <ContinuarViendoRow items={continuarViendo} />
         )}
 
-        <ContentRow
-          title={topContent.length > 0 ? "Top 10" : "Contenido principal"}
-          contents={topContent.length > 0 ? topContent : allContent}
-          loading={loading}
-          linkPrefix="/contenido"
-          emptyMessage="No hay peliculas o series disponibles en este momento. Intentar mas tarde."
-        />
+        {/* HU10: Top 10 most watched */}
+        {topContent.length > 0 && (
+          <ContentRow
+            title="Top 10 en TITOFLIX"
+            contents={topContent.slice(0, 10)}
+            loading={loading}
+            linkPrefix="/contenido"
+            emptyMessage="No hay contenido destacado disponible."
+          />
+        )}
 
+        {/* HU10: Personalized recommendations */}
         {recomendaciones.length > 0 && (
           <ContentRow
             title="Recomendado para ti"
             contents={recomendaciones}
-            loading={false}
+            loading={loading}
             linkPrefix="/contenido"
+            emptyMessage="No hay recomendaciones disponibles."
           />
         )}
+
+        <ContentRow
+          title="Contenido principal"
+          contents={allContent}
+          loading={loading}
+          linkPrefix="/contenido"
+          emptyMessage="No hay peliculas o series disponibles en este momento. Intentar mas tarde."
+        />
 
         <ContentRow
           title="Peliculas"

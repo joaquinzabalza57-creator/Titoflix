@@ -8,7 +8,6 @@ TipoContenido = Literal["pelicula", "serie"]
 ClasificacionEdad = Literal["ATP", "+13", "+16", "+18"]
 
 
-# Schemas HTTP: validan entradas/salidas de FastAPI antes de llegar a servicios.
 class GeneroSchema(BaseModel):
     id: int
     nombre: str
@@ -70,8 +69,6 @@ class UpdateEpisodioSchema(BaseModel):
 
 
 class UpsertVistaSchema(BaseModel):
-    """Request del reproductor para crear o actualizar progreso."""
-
     episodio_id: int | None = None
     contenido_id: int | None = None
     segundos_vistos: int = Field(default=0, ge=0)
@@ -79,8 +76,6 @@ class UpsertVistaSchema(BaseModel):
 
 
 class UpsertCalificacionSchema(BaseModel):
-    """Request de rating enviada desde el detalle del contenido."""
-
     puntaje: int = Field(ge=1, le=5)
 
 
@@ -89,6 +84,7 @@ CreateCalificacionSchema = UpsertCalificacionSchema
 
 
 class MiListaSchema(BaseModel):
+    perfil_id: int
     contenido_id: int
 
 

@@ -2,7 +2,6 @@ from .auth_dto import AdminLoginDTO, AuthAccountDTO, LoginDTO, PerfilAuthDTO, Pe
 from .product_dto import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
-    ContinuarViendoDTO,
     CreateCalificacionDTO,
     CreateContenidoDTO,
     CreateEpisodioDTO,
@@ -13,9 +12,6 @@ from .product_dto import (
     GeneroResponseDTO,
     MiListaDTO,
     ProductResponseDTO,
-    ReporteContenidoVisualizacionDTO,
-    ReporteGeneroVisualizacionDTO,
-    ReporteVisualizacionDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
     UpdateEpisodioDTO,
@@ -52,7 +48,6 @@ __all__ = [
     "CreateContenidoDTO",
     "UpdateContenidoDTO",
     "ContenidoResponseDTO",
-    "ContinuarViendoDTO",
     "CreateProductDTO",
     "UpdateProductDTO",
     "ProductResponseDTO",
@@ -69,7 +64,4 @@ __all__ = [
     "CreateCalificacionDTO",
     "CalificacionResponseDTO",
     "MiListaDTO",
-    "ReporteGeneroVisualizacionDTO",
-    "ReporteContenidoVisualizacionDTO",
-    "ReporteVisualizacionDTO",
 ]

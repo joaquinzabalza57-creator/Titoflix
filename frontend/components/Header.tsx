@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, X } from "lucide-react";
+import { Check, Crown, Loader2, LogOut, Menu, Plus, Settings, User, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { PinModal } from "./PinModal";
-import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
 import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import type { AuthAccount, Profile } from "@/lib/types";
@@ -36,6 +34,7 @@ export function Header({ activeSection, account, onNavigate, onLogout, onProfile
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfile, setSelectedProfileState] = useState(getSelectedProfile());
   const [pinProfile, setPinProfile] = useState<Profile | null>(null);
+  const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -71,6 +70,7 @@ export function Header({ activeSection, account, onNavigate, onLogout, onProfile
     if (profile.id === selectedProfile?.id) return;
     if (profile.has_pin) {
       setPinProfile(profile);
+      setPin("");
       setPinError(null);
       return;
     }
@@ -79,14 +79,15 @@ export function Header({ activeSection, account, onNavigate, onLogout, onProfile
     onProfileChanged();
   };
 
-  const submitPin = async (pin: string) => {
+  const submitPin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!pinProfile) return;
     setPinError(null);
     setLoading(true);
     try {
       await apiRequest(`/auth/perfiles/${pinProfile.id}`, {
         method: "POST",
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin: pin || null }),
       });
       selectProfileLocally(pinProfile);
       setPinProfile(null);
@@ -217,13 +218,24 @@ export function Header({ activeSection, account, onNavigate, onLogout, onProfile
       </div>
 
       {pinProfile && (
-        <PinModal
-          profileName={pinProfile.nombre}
-          loading={loading}
-          error={pinError}
-          onSubmit={submitPin}
-          onCancel={() => setPinProfile(null)}
-        />
+        <Modal title={`PIN de ${pinProfile.nombre}`} onClose={() => setPinProfile(null)}>
+          <form onSubmit={submitPin} className="grid gap-3">
+            <input
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="admin-input"
+              placeholder="PIN de 4 digitos"
+              inputMode="numeric"
+              maxLength={4}
+              autoFocus
+            />
+            {pinError && <p className="text-sm text-primary">{pinError}</p>}
+            <button className="admin-button justify-center" disabled={loading}>
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              Entrar
+            </button>
+          </form>
+        </Modal>
       )}
 
       {createOpen && (
@@ -468,7 +480,6 @@ function AccountSettingsModal({
   const [name, setName] = useState(profile?.nombre || "");
   const [pin, setPin] = useState("");
   const [avatar, setAvatar] = useState<string | null>(profile?.avatar || null);
-  const [esInfantil, setEsInfantil] = useState(profile?.es_infantil || false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -487,10 +498,6 @@ function AccountSettingsModal({
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    if (esInfantil && pin) {
-      setError("Los perfiles infantiles no pueden tener PIN");
-      return;
-    }
     if (pin && !/^\d{4}$/.test(pin)) {
       setError("El PIN debe tener 4 digitos");
       return;
@@ -509,9 +516,8 @@ function AccountSettingsModal({
           method: "PUT",
           body: JSON.stringify({
             nombre: name,
-            pin: esInfantil ? null : pin || undefined,
+            pin: pin || undefined,
             avatar,
-            es_infantil: esInfantil,
           }),
         });
         setSelectedProfile({ id: updated.id, nombre: updated.nombre, avatar: updated.avatar });
@@ -557,25 +563,8 @@ function AccountSettingsModal({
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
                 placeholder="Dejar vacio para conservar"
                 inputMode="numeric"
-                disabled={esInfantil}
               />
             </label>
-            {esInfantil && <p className="-mt-2 text-xs text-muted-foreground">Los perfiles infantiles no usan PIN.</p>}
-            <div className="flex items-center gap-3">
-              <input
-                id="settings-es-infantil"
-                type="checkbox"
-                checked={esInfantil}
-                onChange={(event) => {
-                  setEsInfantil(event.target.checked);
-                  if (event.target.checked) setPin("");
-                }}
-                className="h-5 w-5 rounded border-border bg-secondary text-primary focus:ring-primary"
-              />
-              <label htmlFor="settings-es-infantil" className="text-sm text-foreground">
-                Es un perfil infantil (solo contenido ATP)
-              </label>
-            </div>
             <label className="grid gap-2 text-sm text-foreground">
               Avatar del perfil
               <input type="file" accept="image/*" onChange={(event) => handleAvatarChange(event.target.files?.[0])} />
@@ -609,3 +598,18 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
+function ProfileAvatar({ profile, size }: { profile?: { nombre: string; avatar?: string | null } | null; size: "sm" | "lg" }) {
+  const className = size === "sm" ? "h-8 w-8 text-sm" : "h-24 w-24 text-3xl";
+  const avatarUrl = getAssetUrl(profile?.avatar);
+  return (
+    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded bg-secondary font-bold text-foreground ${className}`}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : profile?.nombre ? (
+        profile.nombre.charAt(0).toUpperCase()
+      ) : (
+        <User size={18} />
+      )}
+    </span>
+  );
+}

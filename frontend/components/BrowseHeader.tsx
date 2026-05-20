@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Crown, Loader2, LogOut, Menu, Plus, Search, Settings, X } from "lucide-react";
+import { Check, Crown, Loader2, LogOut, Menu, Plus, Search, Settings, User, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { PinModal } from "./PinModal";
-import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileCreateScreen } from "./ProfileCreateScreen";
 import { apiRequest, getAssetUrl, getSelectedProfile, logout, setSelectedProfile, MAX_UPLOAD_SIZE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -42,6 +40,7 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileState, setSelectedProfileState] = useState(getSelectedProfile());
   const [pinProfile, setPinProfile] = useState<Profile | null>(null);
+  const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -78,6 +77,7 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
     if (profile.id === selectedProfileState?.id) return;
     if (profile.has_pin) {
       setPinProfile(profile);
+      setPin("");
       setPinError(null);
       return;
     }
@@ -86,14 +86,15 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
     onProfileChanged();
   };
 
-  const submitPin = async (pin: string) => {
+  const submitPin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!pinProfile) return;
     setPinError(null);
     setLoading(true);
     try {
       await apiRequest(`/auth/perfiles/${pinProfile.id}`, {
         method: "POST",
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin: pin || null }),
       });
       selectProfileLocally(pinProfile);
       setPinProfile(null);
@@ -244,13 +245,24 @@ export function BrowseHeader({ activeSection, account, onLogout, onProfileChange
       </div>
 
       {pinProfile && (
-        <PinModal
-          profileName={pinProfile.nombre}
-          loading={loading}
-          error={pinError}
-          onSubmit={submitPin}
-          onCancel={() => setPinProfile(null)}
-        />
+        <Modal title={`PIN de ${pinProfile.nombre}`} onClose={() => setPinProfile(null)}>
+          <form onSubmit={submitPin} className="grid gap-3">
+            <input
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="admin-input"
+              placeholder="PIN de 4 digitos"
+              inputMode="numeric"
+              maxLength={4}
+              autoFocus
+            />
+            {pinError && <p className="text-sm text-primary">{pinError}</p>}
+            <button className="admin-button justify-center" disabled={loading}>
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              Entrar
+            </button>
+          </form>
+        </Modal>
       )}
 
       {createOpen && (
@@ -516,10 +528,6 @@ function AccountSettingsModal({
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    if (esInfantil && pin) {
-      setError("Los perfiles infantiles no pueden tener PIN");
-      return;
-    }
     if (pin && !/^\d{4}$/.test(pin)) {
       setError("El PIN debe tener 4 digitos");
       return;
@@ -538,7 +546,7 @@ function AccountSettingsModal({
           method: "PUT",
           body: JSON.stringify({
             nombre: name,
-            pin: esInfantil ? null : pin || undefined,
+            pin: pin || undefined,
             avatar,
             es_infantil: esInfantil,
           }),
@@ -588,19 +596,14 @@ function AccountSettingsModal({
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
                 placeholder="Dejar vacio para conservar"
                 inputMode="numeric"
-                disabled={esInfantil}
               />
             </label>
-            {esInfantil && <p className="-mt-2 text-xs text-muted-foreground">Los perfiles infantiles no usan PIN.</p>}
             <div className="flex items-center gap-3">
               <input
                 id="settings-es-infantil"
                 type="checkbox"
                 checked={esInfantil}
-                onChange={(e) => {
-                  setEsInfantil(e.target.checked);
-                  if (e.target.checked) setPin("");
-                }}
+                onChange={(e) => setEsInfantil(e.target.checked)}
                 className="h-5 w-5 rounded border-border bg-secondary text-primary focus:ring-primary"
               />
               <label htmlFor="settings-es-infantil" className="text-sm text-foreground">
@@ -643,3 +646,22 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
+function ProfileAvatar({
+  profile,
+  size = "md",
+}: {
+  profile: { nombre: string; avatar?: string | null } | null;
+  size?: "sm" | "md";
+}) {
+  const sizeClass = size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-base";
+  return (
+    <span
+      className={`flex items-center justify-center rounded-md font-bold text-white ${sizeClass}`}
+      style={{
+        background: `linear-gradient(135deg, #009246 0%, #009246 33%, #ffffff 33%, #ffffff 66%, #ce2b37 66%, #ce2b37 100%)`,
+      }}
+    >
+      {(profile?.nombre?.charAt(0) || "?").toUpperCase()}
+    </span>
+  );
+}

@@ -3,8 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-# DTOs internos/de respuesta: la capa de servicios trabaja con estos objetos
-# para no depender directamente de los modelos ORM ni de los schemas HTTP.
 class GeneroResponseDTO(BaseModel):
     id: int
     nombre: str
@@ -136,8 +134,6 @@ class EpisodioResponseDTO(BaseModel):
 
 
 class CreateVistaDTO(BaseModel):
-    """Payload normalizado de progreso; apunta a episodio o contenido, no ambos."""
-
     perfil_id: int
     episodio_id: int | None = None
     contenido_id: int | None = None
@@ -155,18 +151,6 @@ class VistaResponseDTO(BaseModel):
     terminado: bool
 
     model_config = {"from_attributes": True}
-
-
-class ContinuarViendoDTO(BaseModel):
-    """Item enriquecido que el frontend usa en la fila Continuar viendo."""
-
-    contenido: ContenidoResponseDTO
-    episodio: EpisodioResponseDTO | None = None
-    temporada: TemporadaResponseDTO | None = None
-    segundos_vistos: int
-    duracion_total: int
-    terminado: bool
-    actualizado_en: datetime | None = None
 
 
 class CreateCalificacionDTO(BaseModel):
@@ -190,30 +174,6 @@ class MiListaDTO(BaseModel):
     contenido_id: int
 
 
-class ReporteGeneroVisualizacionDTO(BaseModel):
-    id: int
-    nombre: str
-    minutos_vistos: int
-
-
-class ReporteContenidoVisualizacionDTO(BaseModel):
-    contenido_id: int
-    titulo: str
-    tipo: str
-    minutos_vistos: int
-    generos: list[ReporteGeneroVisualizacionDTO] = Field(default_factory=list)
-
-
-class ReporteVisualizacionDTO(BaseModel):
-    anio: int
-    mes: int
-    total_minutos: int
-    total_contenidos: int
-    contenidos: list[ReporteContenidoVisualizacionDTO] = Field(default_factory=list)
-    generos: list[ReporteGeneroVisualizacionDTO] = Field(default_factory=list)
-
-
-# Alias legacy para mantener compatibilidad con imports viejos del proyecto.
 CreateProductDTO = CreateContenidoDTO
 UpdateProductDTO = UpdateContenidoDTO
 ProductResponseDTO = ContenidoResponseDTO

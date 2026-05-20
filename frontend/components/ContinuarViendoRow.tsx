@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Play, Film, Tv } from "lucide-react";
-import { useRef, useState, type MouseEvent } from "react";
-import { apiRequest, getAssetUrl, getBackendUrl } from "@/lib/api";
-import type { ContinuarViendoItem, PlaybackResponse } from "@/lib/types";
+import { useRef } from "react";
+import { getAssetUrl } from "@/lib/api";
+import type { ContinuarViendoItem } from "@/lib/types";
 
 interface ContinuarViendoRowProps {
   items: ContinuarViendoItem[];
@@ -68,12 +67,11 @@ export function ContinuarViendoRow({ items }: ContinuarViendoRowProps) {
 }
 
 function ContinuarViendoCard({ item }: { item: ContinuarViendoItem }) {
-  const router = useRouter();
   const { contenido, episodio, temporada, segundos_vistos, duracion_total } = item;
-  const [loading, setLoading] = useState(false);
   const portadaUrl = getAssetUrl(contenido.portada_url);
   const progress = duracion_total > 0 ? Math.min((segundos_vistos / duracion_total) * 100, 100) : 0;
 
+  // For series, link to the content detail page; for movies, link directly to content
   const href = `/contenido/${contenido.id}`;
 
   const subtitle =
@@ -83,44 +81,15 @@ function ContinuarViendoCard({ item }: { item: ContinuarViendoItem }) {
       ? "Pelicula"
       : null;
 
-  const handlePlay = async (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    try {
-      const path = episodio
-        ? `/episodios/${episodio.id}/playback`
-        : `/contenidos/${contenido.id}/playback`;
-      const data = await apiRequest<PlaybackResponse>(path);
-      const streamUrl = getBackendUrl(data.stream_url);
-      const title = episodio && temporada
-        ? `${contenido.titulo} - T${temporada.numero} E${episodio.numero}: ${episodio.titulo}`
-        : contenido.titulo;
-      const params = new URLSearchParams({
-        url: streamUrl,
-        title,
-        contenido_id: String(contenido.id),
-        start: String(Math.max(0, segundos_vistos)),
-      });
-      if (episodio) {
-        params.set("episodio_id", String(episodio.id));
-      }
-      router.push(`/reproducir?${params.toString()}`);
-    } catch {
-      router.push(href);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <Link href={href} onClick={handlePlay} className="group/continue flex-shrink-0 w-48 md:w-56">
+    <Link href={href} className="group flex-shrink-0 w-48 md:w-56">
       {/* Thumbnail */}
       <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary mb-2">
         {portadaUrl ? (
           <img
             src={portadaUrl}
             alt={contenido.titulo}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover/continue:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -133,13 +102,9 @@ function ContinuarViendoCard({ item }: { item: ContinuarViendoItem }) {
         )}
 
         {/* Play overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/continue:opacity-100 transition-opacity">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-            {loading ? (
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <Play size={20} fill="white" className="text-white ml-0.5" />
-            )}
+            <Play size={20} fill="white" className="text-white ml-0.5" />
           </div>
         </div>
 

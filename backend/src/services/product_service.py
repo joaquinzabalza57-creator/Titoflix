@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -7,7 +5,6 @@ from sqlalchemy.orm import Session
 from src.dtos import (
     CalificacionResponseDTO,
     ContenidoResponseDTO,
-    ContinuarViendoDTO,
     CreateCalificacionDTO,
     CreateContenidoDTO,
     CreateEpisodioDTO,
@@ -15,9 +12,6 @@ from src.dtos import (
     CreateVistaDTO,
     EpisodioResponseDTO,
     GeneroResponseDTO,
-    ReporteContenidoVisualizacionDTO,
-    ReporteGeneroVisualizacionDTO,
-    ReporteVisualizacionDTO,
     VideoProcessingWarningDTO,
     TemporadaResponseDTO,
     UpdateContenidoDTO,
@@ -53,15 +47,12 @@ from src.utils import ConflictError, ForbiddenError, NotFoundError
 
 
 class VideoSourceDTO(BaseModel):
-    """Contrato interno para entregar al router el objeto de video elegido."""
-
     file_id: str
     mime_type: str
     filename: str
 
 
 def _variant_uploads_to_payload(variants) -> dict[str, dict]:
-    """Convierte uploads de storage al formato que persiste VideoVariantRepository."""
     return {
         quality: {
             "video_storage_key": upload.object_key,
@@ -73,15 +64,12 @@ def _variant_uploads_to_payload(variants) -> dict[str, dict]:
 
 
 def _processing_warning(source_quality: str, message: str | None) -> VideoProcessingWarningDTO | None:
-    """Adjunta advertencias de transcodificacion para que el admin las vea."""
     if not message:
         return None
     return VideoProcessingWarningDTO(message=message, source_quality=source_quality)
 
 
 class GeneroService:
-    """Reglas de negocio para generos del catalogo."""
-
     def __init__(self, db: Session):
         self.genero_repo = GeneroRepository(db)
 
@@ -105,14 +93,10 @@ class GeneroService:
 
 
 class ContenidoService:
-    """Reglas de catalogo, carga de videos, portadas y busqueda de contenido."""
-
     def __init__(self, db: Session):
         self.contenido_repo = ContenidoRepository(db)
         self.genero_repo = GeneroRepository(db)
         self.perfil_repo = PerfilRepository(db)
-        self.vista_repo = VistaRepository(db)
-        self.calificacion_repo = CalificacionRepository(db)
         self.video_variant_repo = VideoVariantRepository(db)
 
     def create(self, dto: CreateContenidoDTO) -> ContenidoResponseDTO:
@@ -124,7 +108,6 @@ class ContenidoService:
         video_file: UploadFile | None,
         portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
-        """Crea peliculas/series y, si corresponde, procesa video y portada."""
         self._validate_content_payload(
             tipo=dto.tipo,
             duracion_min=dto.duracion_min,
@@ -186,7 +169,6 @@ class ContenidoService:
         return to_contenido_response(contenido)
 
     def search(self, q=None, tipo=None, genero_id=None, genero=None, perfil_id=None, ordenar=None):
-        """Busca catalogo aplicando filtro infantil cuando llega un perfil."""
         clasificacion_edad = None
         if perfil_id is not None:
             perfil = self.perfil_repo.find_by_id(perfil_id)
@@ -215,7 +197,6 @@ class ContenidoService:
         video_file: UploadFile | None,
         portada_file: UploadFile | None = None,
     ) -> ContenidoResponseDTO:
-        """Actualiza metadata y reemplaza video/portada sin cambiar el tipo de contenido."""
         contenido_actual = self.contenido_repo.find_by_id(contenido_id)
         if not contenido_actual:
             raise NotFoundError("Contenido no encontrado")
@@ -271,7 +252,6 @@ class ContenidoService:
         return response
 
     def delete(self, contenido_id: int) -> None:
-        """Borra contenido y todos sus objetos asociados en storage."""
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:
             raise NotFoundError("Contenido no encontrado")
@@ -297,51 +277,7 @@ class ContenidoService:
         contenidos = self.contenido_repo.top(limit=10, genero=genero)
         return to_contenido_response_list(contenidos)
 
-    def recomendaciones(self, perfil_id: int) -> list[ContenidoResponseDTO]:
-        """Recomienda catalogo por generos vistos/calificados, excluyendo lo ya empezado."""
-        perfil = self.perfil_repo.find_by_id(perfil_id)
-        if not perfil:
-            raise NotFoundError("Perfil no encontrado")
-
-        watched_ids: set[int] = set()
-        genre_scores: dict[int, int] = {}
-
-        for vista in self.vista_repo.list_by_perfil(perfil_id):
-            contenido = vista.contenido
-            if vista.episodio is not None:
-                contenido = vista.episodio.temporada.contenido
-            if not contenido:
-                continue
-            watched_ids.add(contenido.id)
-            weight = 2 if vista.terminado else 1
-            for genero in contenido.generos:
-                genre_scores[genero.id] = genre_scores.get(genero.id, 0) + weight
-
-        for calificacion in self.calificacion_repo.list_by_perfil(perfil_id):
-            watched_ids.add(calificacion.contenido_id)
-            for genero in calificacion.contenido.generos:
-                genre_scores[genero.id] = genre_scores.get(genero.id, 0) + calificacion.puntaje
-
-        contenidos = self.contenido_repo.search(
-            clasificacion_edad="ATP" if perfil.es_infantil else None,
-            ordenar="anio_desc",
-        )
-        candidatos = [contenido for contenido in contenidos if contenido.id not in watched_ids]
-
-        if genre_scores:
-            candidatos.sort(
-                key=lambda contenido: (
-                    sum(genre_scores.get(genero.id, 0) for genero in contenido.generos),
-                    contenido.anio,
-                    contenido.titulo,
-                ),
-                reverse=True,
-            )
-
-        return to_contenido_response_list(candidatos[:10])
-
     def get_video_source(self, contenido_id: int, quality: str | None = None) -> VideoSourceDTO:
-        """Elige la variante pedida o la mejor disponible para reproducir."""
         contenido = self.contenido_repo.find_by_id(contenido_id)
         if not contenido:
             raise NotFoundError("Contenido no encontrado")
@@ -412,8 +348,6 @@ class ContenidoService:
 
 
 class TemporadaService:
-    """Reglas para temporadas pertenecientes a contenidos tipo serie."""
-
     def __init__(self, db: Session):
         self.contenido_repo = ContenidoRepository(db)
         self.temporada_repo = TemporadaRepository(db)
@@ -476,8 +410,6 @@ class TemporadaService:
 
 
 class EpisodioService:
-    """Reglas para episodios, videos transcodificados y miniaturas."""
-
     def __init__(self, db: Session):
         self.temporada_repo = TemporadaRepository(db)
         self.episodio_repo = EpisodioRepository(db)
@@ -491,7 +423,6 @@ class EpisodioService:
         dto: CreateEpisodioDTO,
         video_file: UploadFile | None,
     ) -> EpisodioResponseDTO:
-        """Crea episodio, procesa su video y guarda miniatura generada."""
         temporada = self.temporada_repo.find_by_id(dto.temporada_id)
         if not temporada:
             raise NotFoundError("Temporada no encontrada")
@@ -565,7 +496,6 @@ class EpisodioService:
         dto: UpdateEpisodioDTO,
         video_file: UploadFile | None,
     ) -> EpisodioResponseDTO:
-        """Actualiza datos y opcionalmente reemplaza el video completo del episodio."""
         fields = dto.model_dump(exclude_unset=True, exclude_none=True)
         fields.pop("duracion_min", None)
         episodio = self.episodio_repo.find_by_id(episodio_id)
@@ -682,8 +612,6 @@ class EpisodioService:
 
 
 class VistaService:
-    """Progreso de reproduccion, continuar viendo y restricciones infantiles."""
-
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)
@@ -697,7 +625,6 @@ class VistaService:
         return self.create_or_update(dto)
 
     def create_or_update(self, dto: CreateVistaDTO) -> VistaResponseDTO:
-        """Upsert de progreso; marca terminado automaticamente al superar 90%."""
         perfil = self.perfil_repo.find_by_id(dto.perfil_id)
         if not perfil:
             raise NotFoundError("Perfil no encontrado")
@@ -765,137 +692,13 @@ class VistaService:
         if not deleted:
             raise NotFoundError("Vista no encontrada")
 
-    def continuar_viendo(self, perfil_id: int) -> list[ContinuarViendoDTO]:
+    def continuar_viendo(self, perfil_id: int) -> list[VistaResponseDTO]:
         if not self.perfil_repo.find_by_id(perfil_id):
             raise NotFoundError("Perfil no encontrado")
-        items: list[ContinuarViendoDTO] = []
-        for vista in self.vista_repo.continuar_viendo(perfil_id)[:10]:
-            contenido = vista.contenido
-            episodio = vista.episodio
-            temporada = episodio.temporada if episodio else None
-            if episodio and temporada:
-                contenido = temporada.contenido
-                duracion_total = int((episodio.duracion_min or 0) * 60)
-            elif contenido:
-                duracion_total = int((contenido.duracion_min or 0) * 60)
-            else:
-                continue
-
-            items.append(
-                ContinuarViendoDTO(
-                    contenido=to_contenido_response(contenido),
-                    episodio=to_episodio_response(episodio) if episodio else None,
-                    temporada=to_temporada_response(temporada) if temporada else None,
-                    segundos_vistos=vista.segundos_vistos,
-                    duracion_total=duracion_total,
-                    terminado=bool(vista.terminado),
-                    actualizado_en=vista.fecha,
-                )
-            )
-        return items
-
-
-class ReporteService:
-    """Reportes administrativos sobre consumo de contenido."""
-
-    def __init__(self, db: Session):
-        self.vista_repo = VistaRepository(db)
-
-    def visualizacion(self, anio: int, mes: int) -> ReporteVisualizacionDTO:
-        start, end = self._month_range(anio, mes)
-        content_totals: dict[int, dict] = {}
-        genre_totals: dict[int, dict] = {}
-
-        for vista in self.vista_repo.list_for_visualization_report(start, end):
-            contenido = vista.contenido
-            duracion_min = contenido.duracion_min if contenido else None
-            if vista.episodio is not None:
-                contenido = vista.episodio.temporada.contenido
-                duracion_min = vista.episodio.duracion_min
-
-            if not contenido or not duracion_min:
-                continue
-
-            duracion_seg = duracion_min * 60
-            if not (vista.terminado or vista.segundos_vistos >= duracion_seg * 0.9):
-                continue
-
-            minutos = max(0, round(vista.segundos_vistos / 60))
-            if minutos <= 0:
-                continue
-
-            content_entry = content_totals.setdefault(
-                contenido.id,
-                {
-                    "contenido": contenido,
-                    "minutos": 0,
-                    "generos": {},
-                },
-            )
-            content_entry["minutos"] += minutos
-
-            for genero in contenido.generos:
-                content_entry["generos"][genero.id] = genero
-                genre_entry = genre_totals.setdefault(
-                    genero.id,
-                    {"genero": genero, "minutos": 0},
-                )
-                genre_entry["minutos"] += minutos
-
-        top_contents = sorted(
-            content_totals.values(),
-            key=lambda item: (-item["minutos"], item["contenido"].titulo),
-        )[:20]
-        genre_items = sorted(
-            genre_totals.values(),
-            key=lambda item: (-item["minutos"], item["genero"].nombre),
-        )
-
-        contenidos = [
-            ReporteContenidoVisualizacionDTO(
-                contenido_id=item["contenido"].id,
-                titulo=item["contenido"].titulo,
-                tipo=item["contenido"].tipo,
-                minutos_vistos=item["minutos"],
-                generos=[
-                    ReporteGeneroVisualizacionDTO(
-                        id=genero.id,
-                        nombre=genero.nombre,
-                        minutos_vistos=item["minutos"],
-                    )
-                    for genero in sorted(item["generos"].values(), key=lambda genero: genero.nombre)
-                ],
-            )
-            for item in top_contents
-        ]
-
-        total_minutos = sum(item["minutos"] for item in content_totals.values())
-        return ReporteVisualizacionDTO(
-            anio=anio,
-            mes=mes,
-            total_minutos=total_minutos,
-            total_contenidos=len(content_totals),
-            contenidos=contenidos,
-            generos=[
-                ReporteGeneroVisualizacionDTO(
-                    id=item["genero"].id,
-                    nombre=item["genero"].nombre,
-                    minutos_vistos=item["minutos"],
-                )
-                for item in genre_items
-            ],
-        )
-
-    def _month_range(self, anio: int, mes: int) -> tuple[datetime, datetime]:
-        start = datetime(anio, mes, 1)
-        if mes == 12:
-            return start, datetime(anio + 1, 1, 1)
-        return start, datetime(anio, mes + 1, 1)
+        return to_vista_response_list(self.vista_repo.continuar_viendo(perfil_id)[:10])
 
 
 class MiListaService:
-    """Administracion de la lista personal de cada perfil."""
-
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)
@@ -930,8 +733,6 @@ class MiListaService:
 
 
 class CalificacionService:
-    """Calificaciones, permitidas solo cuando el perfil ya empezo el contenido."""
-
     def __init__(self, db: Session):
         self.perfil_repo = PerfilRepository(db)
         self.contenido_repo = ContenidoRepository(db)
@@ -965,16 +766,6 @@ class CalificacionService:
             puntaje=dto.puntaje,
         )
         return to_calificacion_response(calif)
-
-    def get(self, perfil_id: int, contenido_id: int) -> CalificacionResponseDTO:
-        if not self.perfil_repo.find_by_id(perfil_id):
-            raise NotFoundError("Perfil no encontrado")
-        if not self.contenido_repo.find_by_id(contenido_id):
-            raise NotFoundError("Contenido no encontrado")
-        calificacion = self.calificacion_repo.find_by_perfil_and_contenido(perfil_id, contenido_id)
-        if not calificacion:
-            raise NotFoundError("Calificacion no encontrada")
-        return to_calificacion_response(calificacion)
 
     def create(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
         return self.create_or_update(dto)

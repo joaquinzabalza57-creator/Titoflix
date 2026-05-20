@@ -1,137 +1,170 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { Loader2, Lock, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, Lock, Loader2 } from "lucide-react";
 
-type PinModalProps = {
+interface PinModalProps {
   profileName: string;
-  loading?: boolean;
-  error?: string | null;
-  onSubmit: (pin: string) => void;
+  onSubmit: (pin: string) => Promise<{ success: boolean; error?: string; blockedUntil?: string }>;
   onCancel: () => void;
-};
+}
 
-export function PinModal({ profileName, loading = false, error, onSubmit, onCancel }: PinModalProps) {
-  const [digits, setDigits] = useState(["", "", "", ""]);
-  const [now, setNow] = useState(() => Date.now());
-  const inputs = useRef<Array<HTMLInputElement | null>>([]);
-  const lockedUntil = getLockedUntil(error);
-  const remainingSeconds = lockedUntil ? Math.max(0, Math.ceil((lockedUntil.getTime() - now) / 1000)) : 0;
-  const isLocked = remainingSeconds > 0;
-  const displayError = isLocked
-    ? `Perfil bloqueado hasta dentro de ${formatRemainingTime(remainingSeconds)}`
-    : error;
+export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
+  const [pin, setPin] = useState(["", "", "", ""]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Focus first input on mount
   useEffect(() => {
-    inputs.current[0]?.focus();
+    inputRefs.current[0]?.focus();
   }, []);
 
+  // Countdown for blocked state
   useEffect(() => {
-    if (!lockedUntil) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [lockedUntil?.getTime()]);
+    if (!blockedUntil) return;
 
-  const setDigit = (index: number, value: string) => {
-    if (isLocked) return;
-    if (!/^\d*$/.test(value)) return;
-    const next = [...digits];
-    next[index] = value.slice(-1);
-    setDigits(next);
+    const interval = setInterval(() => {
+      const now = new Date();
+      const blocked = new Date(blockedUntil);
+      if (now >= blocked) {
+        setBlockedUntil(null);
+        setError(null);
+        setPin(["", "", "", ""]);
+        inputRefs.current[0]?.focus();
+      }
+    }, 1000);
 
+    return () => clearInterval(interval);
+  }, [blockedUntil]);
+
+  const handleChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return; // Only digits
+
+    const newPin = [...pin];
+    newPin[index] = value.slice(-1); // Only last digit
+    setPin(newPin);
+    setError(null);
+
+    // Auto-focus next input
     if (value && index < 3) {
-      inputs.current[index + 1]?.focus();
+      inputRefs.current[index + 1]?.focus();
     }
-    if (value && index === 3 && next.every(Boolean)) {
-      onSubmit(next.join(""));
+
+    // Auto-submit when all 4 digits entered
+    if (value && index === 3 && newPin.every((d) => d !== "")) {
+      handleSubmit(newPin.join(""));
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isLocked) return;
-    const pin = digits.join("");
-    if (pin.length === 4) {
-      onSubmit(pin);
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
     }
+  };
+
+  const handleSubmit = async (pinValue: string) => {
+    if (blockedUntil) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await onSubmit(pinValue);
+      if (!result.success) {
+        if (result.blockedUntil) {
+          setBlockedUntil(result.blockedUntil);
+          setError("Demasiados intentos fallidos. Perfil bloqueado por 15 minutos.");
+        } else {
+          setError(result.error || "PIN incorrecto");
+        }
+        setPin(["", "", "", ""]);
+        inputRefs.current[0]?.focus();
+      }
+    } catch {
+      setError("Error al validar el PIN");
+      setPin(["", "", "", ""]);
+      inputRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRemainingTime = () => {
+    if (!blockedUntil) return "";
+    const now = new Date();
+    const blocked = new Date(blockedUntil);
+    const diff = Math.max(0, Math.floor((blocked.getTime() - now.getTime()) / 1000));
+    const minutes = Math.floor(diff / 60);
+    const seconds = diff % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
-      <form onSubmit={handleSubmit} className="relative w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+      <div className="relative w-full max-w-md mx-4 p-6 bg-card rounded-xl border border-border shadow-2xl">
+        {/* Close button */}
         <button
-          type="button"
           onClick={onCancel}
-          className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="absolute top-4 right-4 p-1 rounded-full hover:bg-secondary transition-colors"
           aria-label="Cerrar"
         >
-          <X size={20} />
+          <X size={20} className="text-muted-foreground" />
         </button>
 
-        <div className="mb-5 flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Lock size={28} className="text-primary" />
+        {/* Icon */}
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Lock size={32} className="text-primary" />
           </div>
         </div>
 
-        <h2 className="mb-2 text-center text-xl font-semibold text-foreground">PIN de {profileName}</h2>
-        <div className="mb-5 flex justify-center gap-2">
-          {digits.map((digit, index) => (
+        {/* Title */}
+        <h2 className="text-xl font-semibold text-foreground text-center mb-2">
+          Ingresa el PIN
+        </h2>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          Ingresa el PIN de control parental para acceder al perfil{" "}
+          <span className="font-medium text-foreground">{profileName}</span>
+        </p>
+
+        {/* PIN inputs */}
+        <div className="flex justify-center gap-3 mb-6">
+          {pin.map((digit, index) => (
             <input
               key={index}
-              ref={(element) => {
-                inputs.current[index] = element;
-              }}
+              ref={(el) => { inputRefs.current[index] = el; }}
               type="password"
               inputMode="numeric"
               maxLength={1}
               value={digit}
-              disabled={loading || isLocked}
-              onChange={(event) => setDigit(index, event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Backspace" && !digits[index] && index > 0) {
-                  inputs.current[index - 1]?.focus();
-                }
-              }}
-              className="h-12 w-12 rounded-md border border-border bg-background text-center text-xl font-bold text-foreground outline-none transition-colors focus:border-primary disabled:opacity-60"
+              onChange={(e) => handleChange(index, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(index, e)}
+              disabled={loading || !!blockedUntil}
+              className="w-14 h-14 text-center text-2xl font-bold border-2 border-border rounded-lg bg-background text-foreground focus:border-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label={`Digito ${index + 1} del PIN`}
             />
           ))}
         </div>
 
-        {displayError && (
-          <p className="mb-4 rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-center text-sm text-primary">
-            {displayError}
-          </p>
+        {/* Error message */}
+        {error && (
+          <div className="rounded-lg border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary text-center mb-4">
+            {error}
+            {blockedUntil && (
+              <div className="mt-1 font-mono text-lg">{getRemainingTime()}</div>
+            )}
+          </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading || isLocked || digits.join("").length !== 4}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
-          Entrar
-        </button>
-      </form>
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        )}
+      </div>
     </div>
   );
-}
-
-function getLockedUntil(error?: string | null): Date | null {
-  const match = error?.match(/Perfil bloqueado hasta\s+(.+)$/);
-  if (!match) return null;
-  const rawTimestamp = match[1].trim();
-  const timestamp = /(?:Z|[+-]\d{2}:?\d{2})$/.test(rawTimestamp)
-    ? rawTimestamp
-    : `${rawTimestamp}Z`;
-  const date = new Date(timestamp);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatRemainingTime(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

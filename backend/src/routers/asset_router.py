@@ -10,7 +10,6 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 @router.get("/{asset_path:path}")
 def stream_asset(asset_path: str, request: Request) -> StreamingResponse:
-    """Sirve portadas, miniaturas y avatares privados desde MinIO hacia el frontend."""
     object_key = f"{settings.S3_ASSETS_PREFIX.strip('/')}/{asset_path.strip('/')}"
     stream = StorageService().stream_file(
         object_key=object_key,

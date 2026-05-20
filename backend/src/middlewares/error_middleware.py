@@ -5,7 +5,6 @@ from src.utils.errors import AppError
 
 
 async def app_error_handler(request: Request, exc: AppError):
-    """Convierte errores del dominio en respuestas JSON uniformes para el frontend."""
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.__class__.__name__, "message": exc.message},
