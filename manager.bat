@@ -20,6 +20,7 @@ echo 9. Resetear tablas de Postgres y buckets de MinIO
 echo 10. Iniciar tunel publico
 echo 11. Ver URL del tunel publico
 echo 12. Detener tunel publico
+echo 13. Reconstruir frontend sin cache
 echo 0. Salir
 echo.
 set /p option=Elegi una opcion: 
@@ -36,6 +37,7 @@ if "%option%"=="9" goto reset_db
 if "%option%"=="10" goto start_tunnel
 if "%option%"=="11" goto tunnel_logs
 if "%option%"=="12" goto stop_tunnel
+if "%option%"=="13" goto rebuild_frontend
 if "%option%"=="0" goto end
 goto menu
 
@@ -128,6 +130,25 @@ if errorlevel 1 goto rebuild_failed
 docker compose build --no-cache frontend backend
 if errorlevel 1 goto rebuild_failed
 docker compose up -d --force-recreate
+if errorlevel 1 goto rebuild_failed
+pause
+goto menu
+
+:rebuild_frontend
+call :ensure_env
+if errorlevel 1 (
+    pause
+    goto menu
+)
+call :write_host_ip
+call :check_docker
+if errorlevel 1 (
+    pause
+    goto menu
+)
+docker compose build --no-cache frontend
+if errorlevel 1 goto rebuild_failed
+docker compose up -d --no-deps --force-recreate frontend
 if errorlevel 1 goto rebuild_failed
 pause
 goto menu

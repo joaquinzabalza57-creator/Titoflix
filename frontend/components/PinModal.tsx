@@ -14,6 +14,7 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
@@ -26,9 +27,10 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
     if (!blockedUntil) return;
 
     const interval = setInterval(() => {
-      const now = new Date();
+      const currentTime = Date.now();
+      setNow(currentTime);
       const blocked = new Date(blockedUntil);
-      if (now >= blocked) {
+      if (currentTime >= blocked.getTime()) {
         setBlockedUntil(null);
         setError(null);
         setPin(["", "", "", ""]);
@@ -40,6 +42,7 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
   }, [blockedUntil]);
 
   const handleChange = (index: number, value: string) => {
+    if (blockedUntil) return;
     if (!/^\d*$/.test(value)) return; // Only digits
 
     const newPin = [...pin];
@@ -75,7 +78,8 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
       if (!result.success) {
         if (result.blockedUntil) {
           setBlockedUntil(result.blockedUntil);
-          setError("Demasiados intentos fallidos. Perfil bloqueado por 15 minutos.");
+          setNow(Date.now());
+          setError("Demasiados intentos fallidos.");
         } else {
           setError(result.error || "PIN incorrecto");
         }
@@ -93,12 +97,11 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
 
   const getRemainingTime = () => {
     if (!blockedUntil) return "";
-    const now = new Date();
     const blocked = new Date(blockedUntil);
-    const diff = Math.max(0, Math.floor((blocked.getTime() - now.getTime()) / 1000));
+    const diff = Math.max(0, Math.ceil((blocked.getTime() - now) / 1000));
     const minutes = Math.floor(diff / 60);
     const seconds = diff % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -151,10 +154,9 @@ export function PinModal({ profileName, onSubmit, onCancel }: PinModalProps) {
         {/* Error message */}
         {error && (
           <div className="rounded-lg border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary text-center mb-4">
-            {error}
-            {blockedUntil && (
-              <div className="mt-1 font-mono text-lg">{getRemainingTime()}</div>
-            )}
+            {blockedUntil
+              ? `Demasiados intentos fallidos. Perfil bloqueado hasta dentro de ${getRemainingTime()}.`
+              : error}
           </div>
         )}
 

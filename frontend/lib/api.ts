@@ -4,6 +4,26 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 const DIRECT_API_BASE_URL = process.env.NEXT_PUBLIC_DIRECT_API_URL || "/api/v1";
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
+export class ApiError extends Error {
+  status: number;
+  data: unknown;
+  blockedUntil?: string;
+
+  constructor(message: string, status: number, data: unknown = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+    if (data && typeof data === "object") {
+      const payload = data as Record<string, unknown>;
+      const blockedUntil = payload.bloqueado_hasta || payload.blockedUntil;
+      if (typeof blockedUntil === "string") {
+        this.blockedUntil = blockedUntil;
+      }
+    }
+  }
+}
+
 // Max upload size (bytes). Can be overridden at build time with NEXT_PUBLIC_MAX_UPLOAD_SIZE.
 export const MAX_UPLOAD_SIZE = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 10 * 1024 * 1024; // 10MB
 
@@ -112,11 +132,11 @@ export async function apiRequest<T>(
       const detail = Array.isArray(error?.detail)
         ? error.detail.map((item: { msg?: string }) => item.msg).filter(Boolean).join(". ")
         : error?.detail;
-      throw new Error(error?.message || detail || `Error ${response.status}`);
+      throw new ApiError(error?.message || detail || `Error ${response.status}`, response.status, error);
     }
 
     const text = await response.text().catch(() => "");
-    throw new Error(text.trim() || `Error ${response.status}`);
+    throw new ApiError(text.trim() || `Error ${response.status}`, response.status);
   }
 
   if (response.status === 204) {
@@ -279,11 +299,12 @@ export async function getTopContenidos(genero?: string): Promise<import("@/lib/t
 
 // ─── HU11: Control parental PIN ──────────────────────────────────────────────
 
-export async function desbloquearPerfil(perfilId: number, pin: string): Promise<{ success: boolean; bloqueado_hasta?: string }> {
-  return await apiRequest<{ success: boolean; bloqueado_hasta?: string }>(`/perfiles/${perfilId}/desbloquear`, {
+export async function desbloquearPerfil(perfilId: number, pin: string): Promise<{ success: boolean }> {
+  await apiRequest(`/auth/perfiles/${perfilId}`, {
     method: "POST",
     body: JSON.stringify({ pin }),
   });
+  return { success: true };
 }
 
 export async function setPinCuenta(cuentaId: number, pin: string): Promise<void> {

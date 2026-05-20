@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Plus, Loader2, Lock } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { PinModal } from "@/components/PinModal";
-import { apiRequest, setSelectedProfile, desbloquearPerfil, getCuentaInfo } from "@/lib/api";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { apiRequest, setSelectedProfile, desbloquearPerfil } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { Profile } from "@/lib/types";
 
@@ -23,8 +24,6 @@ export default function ProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // HU11: PIN validation state
-  const [hasPin, setHasPin] = useState(false);
   const [selectedProfileForPin, setSelectedProfileForPin] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -52,12 +51,6 @@ export default function ProfilesPage() {
           return;
         }
         setProfiles(data);
-
-        // HU11: Check if account has PIN configured
-        const cuentaInfo = await getCuentaInfo(account.id).catch(() => null);
-        if (cuentaInfo) {
-          setHasPin(cuentaInfo.has_pin);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudieron cargar los perfiles");
       } finally {
@@ -71,13 +64,11 @@ export default function ProfilesPage() {
   }, [account, router]);
 
   const handleProfileSelect = (profile: Profile) => {
-    // HU11: If account has PIN and profile is not infantil, require PIN
-    if (hasPin && !profile.es_infantil) {
+    if (profile.has_pin) {
       setSelectedProfileForPin(profile);
       return;
     }
 
-    // No PIN required, proceed directly
     completeProfileSelection(profile);
   };
 
@@ -103,19 +94,13 @@ export default function ProfilesPage() {
       return {
         success: false,
         error: "PIN incorrecto",
-        blockedUntil: result.bloqueado_hasta,
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al validar PIN";
-      // Check if it's a block error
-      if (errorMessage.includes("bloqueado") || errorMessage.includes("locked")) {
-        return {
-          success: false,
-          error: "Perfil bloqueado por demasiados intentos fallidos",
-          blockedUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        };
-      }
-      return { success: false, error: errorMessage };
+      const blockedUntil = err instanceof Error && "blockedUntil" in err
+        ? (err as { blockedUntil?: string }).blockedUntil
+        : undefined;
+      return { success: false, error: errorMessage, blockedUntil };
     }
   };
 
@@ -138,8 +123,6 @@ export default function ProfilesPage() {
     );
   }
 
-  const canCreateProfile = account ? profiles.length < planLimits[account.plan] : false;
-
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background px-4">
       <BrandLogo size="lg" className="mb-12" />
@@ -160,17 +143,9 @@ export default function ProfilesPage() {
               onClick={() => handleProfileSelect(profile)}
               className="group flex flex-col items-center gap-3 focus:outline-none"
             >
-              <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-lg overflow-hidden border-2 border-transparent group-hover:border-tito-white group-focus:border-tito-white transition-all duration-200">
-                <div 
-                  className="w-full h-full flex items-center justify-center text-4xl md:text-5xl font-bold text-white"
-                  style={{
-                    background: `linear-gradient(135deg, #009246 0%, #009246 33%, #ffffff 33%, #ffffff 66%, #ce2b37 66%, #ce2b37 100%)`,
-                  }}
-                >
-                  {profile.nombre.charAt(0).toUpperCase()}
-                </div>
-                {/* HU11: Show lock icon for non-infantil profiles when PIN is set */}
-                {hasPin && !profile.es_infantil && (
+              <div className="relative rounded-lg border-2 border-transparent transition-all duration-200 group-hover:border-tito-white group-focus:border-tito-white">
+                <ProfileAvatar profile={profile} size="lg" />
+                {profile.has_pin && (
                   <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-background/90 flex items-center justify-center">
                     <Lock size={14} className="text-muted-foreground" />
                   </div>
