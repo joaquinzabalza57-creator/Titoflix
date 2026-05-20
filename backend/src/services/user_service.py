@@ -19,6 +19,8 @@ from src.repositories import CuentaRepository, PerfilRepository
 # Importa repositorios de datos
 # Repositorio para Cuentas y para Perfiles
 
+from src.config.env import settings
+from src.services.storage_service import StorageService
 from src.utils import ConflictError, NotFoundError, hash_password
 
 
@@ -46,6 +48,7 @@ class CuentaService:                                            # Servicio para 
             email=dto.email,
             password_hash=password_hash,
             plan=dto.plan,
+            is_admin=dto.is_admin,
         )
 
         return to_cuenta_response(cuenta)                       # Retorna respuesta mapeada
@@ -86,6 +89,13 @@ class CuentaService:                                            # Servicio para 
         return to_cuenta_response(cuenta)                       # Retorna cuenta actualizada
 
     def delete(self, cuenta_id: int) -> None:                   # Elimina una cuenta
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
+        if not cuenta:
+            raise NotFoundError("Cuenta no encontrada")
+
+        StorageService().delete_prefix(
+            f"{settings.S3_ASSETS_PREFIX.strip('/')}/cuentas/{cuenta_id}"
+        )
         deleted = self.cuenta_repo.delete(cuenta_id)            # Ejecuta eliminación
 
         if not deleted:                                         # Si no pudo eliminar (no existe), lanza error
@@ -121,8 +131,16 @@ class PerfilService:                                            # Servicio para 
             nombre=dto.nombre,
             pin=pin_hash,
             es_infantil=dto.es_infantil,
-            avatar=dto.avatar,
+            avatar=None,
         )
+
+        if dto.avatar:
+            try:
+                avatar = self._store_avatar(dto.avatar, dto.cuenta_id, perfil.id, dto.nombre)
+                perfil = self.perfil_repo.update(perfil.id, avatar=avatar) or perfil
+            except Exception:
+                self.perfil_repo.delete(perfil.id)
+                raise
 
         return to_perfil_response(perfil)                       # Retorna respuesta mapeada
 
@@ -162,6 +180,19 @@ class PerfilService:                                            # Servicio para 
         if "pin" in fields:
             fields["pin"] = hash_password(fields["pin"]) if fields["pin"] else None
 
+        if "avatar" in fields:
+            avatar = fields["avatar"]
+            if avatar and self._is_data_url(avatar):
+                fields["avatar"] = self._store_avatar(
+                    avatar,
+                    perfil_actual.cuenta_id,
+                    perfil_actual.id,
+                    fields.get("nombre") or perfil_actual.nombre,
+                )
+                self._delete_stored_avatar(perfil_actual.avatar)
+            elif avatar is None:
+                self._delete_stored_avatar(perfil_actual.avatar)
+
         perfil = self.perfil_repo.update(perfil_id, **fields)   # Aplica cambios
 
         if not perfil:                                          # Valida existencia
@@ -169,8 +200,34 @@ class PerfilService:                                            # Servicio para 
 
         return to_perfil_response(perfil)                       # Retorna perfil actualizado
 
-    def delete(self, perfil_id: int) -> None:                   # Elimina un perfil
-        deleted = self.perfil_repo.delete(perfil_id)            # Ejecuta borrado
-
-        if not deleted:                                         # Valida si existía el perfil
+    def delete(self, perfil_id: int) -> None:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+        if not perfil:
             raise NotFoundError("Perfil no encontrado")
+
+        StorageService().delete_prefix(
+            f"{settings.S3_ASSETS_PREFIX.strip('/')}/cuentas/{perfil.cuenta_id}/perfiles/{perfil_id}"
+        )
+        deleted = self.perfil_repo.delete(perfil_id)
+
+        if not deleted:
+            raise NotFoundError("Perfil no encontrado")
+
+    def _store_avatar(self, avatar: str, cuenta_id: int, perfil_id: int, profile_name: str) -> str:
+        if not self._is_data_url(avatar):
+            return avatar
+
+        upload = StorageService().upload_asset_data_url(
+            avatar,
+            cuenta_id=cuenta_id,
+            perfil_id=perfil_id,
+            filename=f"{profile_name}-avatar",
+        )
+        return upload.object_key
+
+    def _delete_stored_avatar(self, avatar: str | None) -> None:
+        if avatar and avatar.startswith(f"{settings.S3_ASSETS_PREFIX.strip('/')}/"):
+            StorageService().delete_object(avatar)
+
+    def _is_data_url(self, value: str) -> bool:
+        return value.startswith("data:")

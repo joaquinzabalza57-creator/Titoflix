@@ -1,36 +1,95 @@
-from sqlalchemy.orm import Session                               # Importa la sesión de SQLAlchemy
+from sqlalchemy.orm import Session
 
-from src.dtos import LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, TokenDTO # Importa DTOs de autenticación
-from src.repositories import CuentaRepository, PerfilRepository # Importa repositorios necesarios
-from src.utils import UnauthorizedError, verify_password, create_access_token # Utilidades de seguridad
+from src.config import settings
+from src.dtos import AdminLoginDTO, AuthAccountDTO, LoginDTO, PerfilAuthDTO, PerfilAuthResponseDTO, TokenDTO
+from src.repositories import CuentaRepository, PerfilRepository
+from src.utils import UnauthorizedError, create_access_token, verify_password
 
 
-class AuthService:                                               # Servicio para lógica de autenticación
-    def __init__(self, db: Session):                             # Inicializa repositorios requeridos
-        self.cuenta_repo = CuentaRepository(db)                  # Repositorio de Cuentas
-        self.perfil_repo = PerfilRepository(db)                  # Repositorio de Perfiles
+class AuthService:
+    def __init__(self, db: Session):
+        self.cuenta_repo = CuentaRepository(db)
+        self.perfil_repo = PerfilRepository(db)
 
-    def login(self, dto: LoginDTO) -> TokenDTO:                  # Gestiona el inicio de sesión de la cuenta
-        cuenta = self.cuenta_repo.find_by_email(dto.email)       # Busca la cuenta por email
+    def login(self, dto: LoginDTO) -> TokenDTO:
+        cuenta = self.cuenta_repo.find_by_email(dto.email)
 
-        if not cuenta or not verify_password(dto.password, cuenta.password_hash): # Valida credenciales
-            raise UnauthorizedError("Credenciales invalidas")    # Error si no coincide email o password
+        if not cuenta or not verify_password(dto.password, cuenta.password_hash):
+            raise UnauthorizedError("Credenciales invalidas")
 
-        token = create_access_token({"sub": str(cuenta.id), "email": cuenta.email}) # Genera JWT de cuenta
+        token = create_access_token(
+            {
+                "sub": str(cuenta.id),
+                "email": cuenta.email,
+                "admin": bool(cuenta.is_admin),
+            }
+        )
+        return TokenDTO(
+            access_token=token,
+            token_type="bearer",
+            id=cuenta.id,
+            is_admin=bool(cuenta.is_admin),
+            email=cuenta.email,
+        )
 
-        return TokenDTO(access_token=token, token_type="bearer") # Retorna DTO con el token generado
+    def admin_login(self, dto: AdminLoginDTO) -> TokenDTO:
+        cuenta = None
 
-    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> PerfilAuthResponseDTO: # Valida acceso a perfil
-        perfil = self.perfil_repo.find_by_id(perfil_id)          # Busca el perfil solicitado
+        if dto.username:
+            cuenta = self.cuenta_repo.find_by_email(dto.username)
+            if not cuenta or not cuenta.is_admin:
+                raise UnauthorizedError("Credenciales admin invalidas")
 
-        if not perfil or perfil.cuenta_id != cuenta_id:          # Valida pertenencia del perfil a la cuenta
-            raise UnauthorizedError("Perfil no autorizado")      # Error de propiedad o existencia
+            if not verify_password(dto.password, cuenta.password_hash):
+                raise UnauthorizedError("Credenciales admin invalidas")
+        else:
+            admins = self.cuenta_repo.list_admins()
+            for admin in admins:
+                if verify_password(dto.password, admin.password_hash):
+                    cuenta = admin
+                    break
 
-        if perfil.pin and (dto.pin is None or not verify_password(dto.pin, perfil.pin)): # Valida PIN si existe
-            raise UnauthorizedError("PIN invalido")              # Error de PIN incorrecto o ausente
+            if not cuenta:
+                raise UnauthorizedError("Credenciales admin invalidas")
+
+        token = create_access_token(
+            {
+                "sub": str(cuenta.id),
+                "email": cuenta.email,
+                "admin": True,
+            }
+        )
+        return TokenDTO(
+            access_token=token,
+            token_type="bearer",
+            id=cuenta.id,
+            is_admin=True,
+            email=cuenta.email,
+        )
+
+    def get_current_account(self, cuenta_id: int) -> AuthAccountDTO:
+        cuenta = self.cuenta_repo.find_by_id(cuenta_id)
+        if not cuenta:
+            raise UnauthorizedError("Cuenta no encontrada")
+
+        return AuthAccountDTO(
+            id=cuenta.id,
+            email=cuenta.email,
+            plan=cuenta.plan,
+            is_admin=bool(cuenta.is_admin),
+        )
+
+    def auth_perfil(self, cuenta_id: int, perfil_id: int, dto: PerfilAuthDTO) -> PerfilAuthResponseDTO:
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+
+        if not perfil or perfil.cuenta_id != cuenta_id:
+            raise UnauthorizedError("Perfil no autorizado")
+
+        if perfil.pin and (dto.pin is None or not verify_password(dto.pin, perfil.pin)):
+            raise UnauthorizedError("PIN invalido")
 
         return PerfilAuthResponseDTO(
             message="Perfil autorizado",
             perfil_id=perfil.id,
-            cuenta_id=cuenta_id,
+            cuenta_id=perfil.cuenta_id,
         )

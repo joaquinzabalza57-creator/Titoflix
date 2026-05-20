@@ -8,7 +8,9 @@ def to_cuenta_response(cuenta: Cuenta) -> CuentaResponseDTO:    # Convierte Cuen
 
 def to_perfil_response(perfil: Perfil) -> PerfilResponseDTO:    # Convierte Perfil a DTO
     """Convierte un Model SQLAlchemy en un DTO de respuesta (sin campos sensibles)."""
-    return PerfilResponseDTO.model_validate(perfil)             # Valida y transforma al esquema
+    dto = PerfilResponseDTO.model_validate(perfil)              # Valida y transforma al esquema
+    dto.has_pin = bool(perfil.pin)
+    return dto
 
 
 def to_cuenta_response_list(cuentas: list[Cuenta]) -> list[CuentaResponseDTO]:    # Convierte lista de Cuentas a DTOs

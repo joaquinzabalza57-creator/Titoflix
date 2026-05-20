@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "cambiame-en-produccion"   # Clave secreta para firmar tokens JWT
     JWT_ALGORITHM: str = "HS256"                # Algoritmo de encriptación para JWT
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60       # Tiempo de expiración del token (en minutos)
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_PUBLIC_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str = "titoflix"
+    S3_SECRET_KEY: str = "titoflix-secret"
+    S3_BUCKET_NAME: str = "titoflix-media"
+    S3_REGION: str = "us-east-1"
+    S3_MEDIA_PREFIX: str = "media"
+    S3_ASSETS_PREFIX: str = "assets"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    ADMIN_USERNAME: str = "titoflix-admin"
+    ADMIN_PASSWORD: str = "admin1234"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

@@ -7,8 +7,13 @@ class CuentaRepository:
     def __init__(self, db: Session):                                     # Inicializa el repositorio con la sesión de DB
         self.db = db
 
-    def create(self, email: str, password_hash: str, plan: str) -> Cuenta: # Crea y persiste una nueva cuenta
-        cuenta = Cuenta(email=email, password_hash=password_hash, plan=plan)
+    def create(self, email: str, password_hash: str, plan: str, is_admin: bool = False) -> Cuenta: # Crea y persiste una nueva cuenta
+        cuenta = Cuenta(
+            email=email,
+            password_hash=password_hash,
+            plan=plan,
+            is_admin=is_admin,
+        )
         self.db.add(cuenta)
         self.db.commit()                                                 # Guarda cambios en la base de datos
         self.db.refresh(cuenta)                                          # Actualiza la instancia con datos de DB
@@ -19,6 +24,9 @@ class CuentaRepository:
 
     def find_by_email(self, email: str) -> Cuenta | None:                # Busca cuenta por email
         return self.db.query(Cuenta).filter(Cuenta.email == email).first()
+
+    def list_admins(self) -> list[Cuenta]:                                 # Lista todas las cuentas admin
+        return self.db.query(Cuenta).filter(Cuenta.is_admin.is_(True)).all()
 
     def list_all(self) -> list[Cuenta]:                                  # Obtiene todos los registros de cuentas
         return self.db.query(Cuenta).all()

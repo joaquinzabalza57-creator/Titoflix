@@ -1,123 +1,179 @@
-from datetime import datetime              # Manejo de fechas y horas (aunque no se usa directamente aquí)
+from datetime import datetime
 
-from pydantic import BaseModel, Field      # Base para definir DTOs
+from pydantic import BaseModel, Field
 
 
 class GeneroResponseDTO(BaseModel):
-    id: int                                # ID único del género
-    nombre: str                            # Nombre del género
+    id: int
+    nombre: str
 
-    model_config = {"from_attributes": True}  # Permite crear el DTO desde objetos ORM (SQLAlchemy)
+    model_config = {"from_attributes": True}
+
+
+class VideoVariantResponseDTO(BaseModel):
+    id: int
+    quality: str
+    video_storage_key: str
+    video_mime: str | None = None
+    video_size: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class VideoProcessingWarningDTO(BaseModel):
+    message: str
+    source_quality: str
 
 
 class CreateContenidoDTO(BaseModel):
-    titulo: str                              # Título del contenido
-    tipo: str                                # Tipo de contenido (pelicula o serie)
-    anio: int                                # Año de lanzamiento
-    descripcion: str | None = None           # Descripción opcional
-    duracion_min: int | None = None          # Duración en minutos (opcional)
-    clasificacion_edad: str                  # Clasificación por edad
-    generos_ids: list[int] = Field(default_factory=list)  # Lista de IDs de generos asociados
+    titulo: str
+    tipo: str
+    anio: int
+    descripcion: str | None = None
+    duracion_min: float | None = None
+    clasificacion_edad: str
+    generos_ids: list[int] = Field(default_factory=list)
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
+    portada_url: str | None = None
 
 
 class UpdateContenidoDTO(BaseModel):
-    titulo: str | None = None                # Título opcional (para actualización)
-    tipo: str | None = None                 # Tipo opcional
-    anio: int | None = None                 # Año opcional
-    descripcion: str | None = None          # Descripción opcional
-    duracion_min: int | None = None         # Duración opcional
-    clasificacion_edad: str | None = None   # Clasificación opcional
-    generos_ids: list[int] | None = None    # Lista opcional de IDs de géneros
+    titulo: str | None = None
+    tipo: str | None = None
+    anio: int | None = None
+    descripcion: str | None = None
+    duracion_min: float | None = None
+    clasificacion_edad: str | None = None
+    generos_ids: list[int] | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
+    portada_url: str | None = None
 
 
 class ContenidoResponseDTO(BaseModel):
-    id: int                                      # ID único del contenido
-    titulo: str                                  # Título del contenido
-    tipo: str                                    # Tipo de contenido (pelicula, serie)
-    anio: int                                    # Año de lanzamiento
-    descripcion: str | None = None               # Descripción breve (opcional)
-    duracion_min: int | None = None              # Duración en minutos (opcional)
-    clasificacion_edad: str                      # Clasificación por edad (ATP, +13, etc.)
-    generos: list[GeneroResponseDTO] = Field(default_factory=list)  # Lista de generos asociados
+    id: int
+    titulo: str
+    tipo: str
+    anio: int
+    descripcion: str | None = None
+    duracion_min: float | None = None
+    clasificacion_edad: str
+    generos: list[GeneroResponseDTO] = Field(default_factory=list)
     promedio_calificaciones: float | None = None
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
+    video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
+    portada_url: str | None = None
+    processing_warning: VideoProcessingWarningDTO | None = None
 
-    model_config = {"from_attributes": True}     # Permite convertir desde el objeto ORM
+    model_config = {"from_attributes": True}
 
 
 class CreateTemporadaDTO(BaseModel):
-    contenido_id: int                            # ID de la serie asociada
-    numero: int                                  # Número de la temporada
-    anio: int                                    # Año de estreno de la temporada
+    contenido_id: int
+    numero: int
+    anio: int
+    storage_folder_id: str | None = None
+
+
+class UpdateTemporadaDTO(BaseModel):
+    numero: int | None = None
+    anio: int | None = None
 
 
 class TemporadaResponseDTO(BaseModel):
-    id: int                                      # ID único de la temporada
-    contenido_id: int                            # ID del contenido (serie) al que pertenece
-    numero: int                                  # Número de la temporada
-    anio: int                                    # Año de estreno de la temporada
+    id: int
+    contenido_id: int
+    numero: int
+    anio: int
+    storage_folder_id: str | None = None
 
-    model_config = {"from_attributes": True}     # Configuración para lectura desde ORM
+    model_config = {"from_attributes": True}
 
 
 class CreateEpisodioDTO(BaseModel):
-    temporada_id: int                            # ID de la temporada a la que pertenece
-    numero: int                                  # Número del episodio
-    titulo: str                                  # Título del episodio
-    duracion_min: int                            # Duración en minutos
+    temporada_id: int
+    numero: int
+    titulo: str
+    duracion_min: float | None = None
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
+    thumbnail_url: str | None = None
+
+
+class UpdateEpisodioDTO(BaseModel):
+    numero: int | None = None
+    titulo: str | None = None
+    duracion_min: float | None = None
+    thumbnail_url: str | None = None
 
 
 class EpisodioResponseDTO(BaseModel):
-    id: int                                      # ID único del episodio
-    temporada_id: int                            # ID de la temporada asociada
-    numero: int                                  # Número del episodio
-    titulo: str                                  # Título del episodio
-    duracion_min: int                            # Duración en minutos
+    id: int
+    temporada_id: int
+    numero: int
+    titulo: str
+    duracion_min: float
+    storage_folder_id: str | None = None
+    video_storage_key: str | None = None
+    video_mime: str | None = None
+    video_size: int | None = None
+    video_variants: list[VideoVariantResponseDTO] = Field(default_factory=list)
+    thumbnail_url: str | None = None
+    processing_warning: VideoProcessingWarningDTO | None = None
 
-    model_config = {"from_attributes": True}     # Configuración para lectura desde ORM
+    model_config = {"from_attributes": True}
 
 
 class CreateVistaDTO(BaseModel):
-    perfil_id: int                               # ID del perfil que ve el episodio
-    episodio_id: int | None = None               # ID del episodio que se esta viendo
-    contenido_id: int | None = None              # ID de la pelicula que se esta viendo
-    segundos_vistos: int = 0                     # Tiempo reproducido en segundos
-    terminado: bool = False                      # Estado: True si completó el episodio
+    perfil_id: int
+    episodio_id: int | None = None
+    contenido_id: int | None = None
+    segundos_vistos: int = 0
+    terminado: bool = False
 
 
 class VistaResponseDTO(BaseModel):
-    id: int                                      # ID único de la vista
-    perfil_id: int                               # ID del perfil que realizó la vista
-    episodio_id: int | None = None               # ID del episodio visto
-    contenido_id: int | None = None              # ID de la pelicula vista
-    fecha: datetime | None = None                # Fecha y hora de la visualización
-    segundos_vistos: int                         # Cantidad de segundos reproducidos
-    terminado: bool                              # Indica si el episodio se vio completo
+    id: int
+    perfil_id: int
+    episodio_id: int | None = None
+    contenido_id: int | None = None
+    fecha: datetime | None = None
+    segundos_vistos: int
+    terminado: bool
 
-    model_config = {"from_attributes": True}     # Configuración para lectura desde ORM
+    model_config = {"from_attributes": True}
 
 
 class CreateCalificacionDTO(BaseModel):
-    perfil_id: int                               # ID del perfil que califica
-    contenido_id: int                            # ID del contenido calificado
-    puntaje: int                                 # Puntuación otorgada (escala de 1 a 5)
+    perfil_id: int
+    contenido_id: int
+    puntaje: int
 
 
 class CalificacionResponseDTO(BaseModel):
-    id: int                                      # ID único de la calificación
-    perfil_id: int                               # ID del perfil que califica
-    contenido_id: int                            # ID del contenido calificado
-    puntaje: int                                 # Puntaje otorgado
-    fecha: datetime | None = None                # Fecha de la calificación
+    id: int
+    perfil_id: int
+    contenido_id: int
+    puntaje: int
+    fecha: datetime | None = None
 
-    model_config = {"from_attributes": True}     # Configuración para lectura desde ORM
+    model_config = {"from_attributes": True}
 
 
 class MiListaDTO(BaseModel):
-    perfil_id: int                               # ID del perfil dueño de la lista
-    contenido_id: int                            # ID del contenido en la lista
+    perfil_id: int
+    contenido_id: int
 
 
-# Alias de clases para estandarizar nombres de DTOs
 CreateProductDTO = CreateContenidoDTO
 UpdateProductDTO = UpdateContenidoDTO
-ProductResponseDTO = ContenidoResponseDTO 
+ProductResponseDTO = ContenidoResponseDTO
