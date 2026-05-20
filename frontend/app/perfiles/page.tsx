@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Lock } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { PinModal } from "@/components/PinModal";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiRequest, setSelectedProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { Profile } from "@/lib/types";
@@ -21,6 +23,9 @@ export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pinProfile, setPinProfile] = useState<Profile | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinLoading, setPinLoading] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -59,11 +64,37 @@ export default function ProfilesPage() {
     }
   }, [account, router]);
 
-  const handleProfileSelect = (profile: Profile) => {
+  const completeProfileSelection = (profile: Profile) => {
     const selectedProfileData = { id: profile.id, nombre: profile.nombre, avatar: profile.avatar };
     setSelectedProfile(selectedProfileData);
     selectProfile(selectedProfileData);
     router.push("/inicio");
+  };
+
+  const handleProfileSelect = (profile: Profile) => {
+    if (profile.has_pin) {
+      setPinProfile(profile);
+      setPinError(null);
+      return;
+    }
+    completeProfileSelection(profile);
+  };
+
+  const handlePinSubmit = async (pin: string) => {
+    if (!pinProfile) return;
+    setPinLoading(true);
+    setPinError(null);
+    try {
+      await apiRequest(`/auth/perfiles/${pinProfile.id}`, {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+      });
+      completeProfileSelection(pinProfile);
+    } catch (err) {
+      setPinError(err instanceof Error ? err.message : "PIN invalido");
+    } finally {
+      setPinLoading(false);
+    }
   };
 
   const handleCreateProfile = () => {
@@ -107,15 +138,13 @@ export default function ProfilesPage() {
               onClick={() => handleProfileSelect(profile)}
               className="group flex flex-col items-center gap-3 focus:outline-none"
             >
-              <div className="w-28 h-28 md:w-36 md:h-36 rounded-lg overflow-hidden border-2 border-transparent group-hover:border-tito-white group-focus:border-tito-white transition-all duration-200">
-                <div 
-                  className="w-full h-full flex items-center justify-center text-4xl md:text-5xl font-bold text-white"
-                  style={{
-                    background: `linear-gradient(135deg, #009246 0%, #009246 33%, #ffffff 33%, #ffffff 66%, #ce2b37 66%, #ce2b37 100%)`,
-                  }}
-                >
-                  {profile.nombre.charAt(0).toUpperCase()}
-                </div>
+              <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-lg overflow-hidden border-2 border-transparent group-hover:border-tito-white group-focus:border-tito-white transition-all duration-200">
+                <ProfileAvatar profile={profile} size="lg" className="h-full w-full" />
+                {profile.has_pin && (
+                  <div className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-muted-foreground">
+                    <Lock size={15} />
+                  </div>
+                )}
               </div>
               <span className="text-muted-foreground group-hover:text-foreground transition-colors text-sm md:text-base">
                 {profile.nombre}
@@ -135,6 +164,15 @@ export default function ProfilesPage() {
             </span>
           </button>
         </div>
+      )}
+      {pinProfile && (
+        <PinModal
+          profileName={pinProfile.nombre}
+          loading={pinLoading}
+          error={pinError}
+          onSubmit={handlePinSubmit}
+          onCancel={() => setPinProfile(null)}
+        />
       )}
     </div>
   );

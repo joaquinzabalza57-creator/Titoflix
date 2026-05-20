@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Hero } from "@/components/Hero";
 import { ContentRow } from "@/components/ContentRow";
 import { ContinuarViendoRow } from "@/components/ContinuarViendoRow";
-import { apiRequest, getSelectedProfile } from "@/lib/api";
+import { apiRequest, getRecomendaciones, getSelectedProfile } from "@/lib/api";
 import type { Contenido, ContinuarViendoItem } from "@/lib/types";
 
 const mockContenidos: Contenido[] = [
@@ -31,6 +31,7 @@ const mockContenidos: Contenido[] = [
 export default function InicioPage() {
   const [allContent, setAllContent] = useState<Contenido[]>([]);
   const [topContent, setTopContent] = useState<Contenido[]>([]);
+  const [recomendaciones, setRecomendaciones] = useState<Contenido[]>([]);
   const [miLista, setMiLista] = useState<Contenido[]>([]);
   const [continuarViendo, setContinuarViendo] = useState<ContinuarViendoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,9 @@ export default function InicioPage() {
 
       const profile = getSelectedProfile();
       if (profile && profile.id > 0) {
+        const recs = await getRecomendaciones(profile.id).catch(() => []);
+        setRecomendaciones(recs);
+
         // HU8: mi lista
         const lista = await apiRequest<Contenido[]>(`/perfiles/${profile.id}/mi-lista`).catch(() => []);
         setMiLista(lista);
@@ -82,12 +86,21 @@ export default function InicioPage() {
         )}
 
         <ContentRow
-          title="Contenido principal"
+          title={topContent.length > 0 ? "Top 10" : "Contenido principal"}
           contents={topContent.length > 0 ? topContent : allContent}
           loading={loading}
           linkPrefix="/contenido"
           emptyMessage="No hay peliculas o series disponibles en este momento. Intentar mas tarde."
         />
+
+        {recomendaciones.length > 0 && (
+          <ContentRow
+            title="Recomendado para ti"
+            contents={recomendaciones}
+            loading={false}
+            linkPrefix="/contenido"
+          />
+        )}
 
         <ContentRow
           title="Peliculas"

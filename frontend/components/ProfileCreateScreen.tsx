@@ -16,6 +16,7 @@ interface ProfileCreateScreenProps {
 export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, compact = false }: ProfileCreateScreenProps) {
   const [nombre, setNombre] = useState("");
   const [pin, setPin] = useState("");
+  const [esInfantil, setEsInfantil] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +53,10 @@ export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, com
       setError("El PIN debe tener 4 digitos");
       return;
     }
+    if (esInfantil && cleanPin) {
+      setError("Los perfiles infantiles no pueden tener PIN");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -59,8 +64,9 @@ export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, com
         method: "POST",
         body: JSON.stringify({
           nombre: cleanName,
-          pin: cleanPin || null,
+          pin: esInfantil ? null : cleanPin || null,
           avatar,
+          es_infantil: esInfantil,
         }),
       });
       const selectedProfile = { id: profile.id, nombre: profile.nombre, avatar: profile.avatar };
@@ -136,9 +142,28 @@ export function ProfileCreateScreen({ accountId, onProfileCreated, onCancel, com
           placeholder="4 digitos"
           inputMode="numeric"
           maxLength={4}
-          disabled={loading}
+          disabled={loading || esInfantil}
         />
-        <p className="mb-5 text-xs text-muted-foreground">Dejalo vacio si no queres proteger este perfil.</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          {esInfantil ? "Los perfiles infantiles no usan PIN." : "Dejalo vacio si no queres proteger este perfil."}
+        </p>
+
+        <div className="mb-5 flex items-center gap-3">
+          <input
+            id="profile-create-screen-infantil"
+            type="checkbox"
+            checked={esInfantil}
+            onChange={(event) => {
+              setEsInfantil(event.target.checked);
+              if (event.target.checked) setPin("");
+            }}
+            className="h-5 w-5 rounded border-border bg-secondary text-primary focus:ring-primary"
+            disabled={loading}
+          />
+          <label htmlFor="profile-create-screen-infantil" className="text-sm text-foreground">
+            Es un perfil infantil (solo contenido ATP)
+          </label>
+        </div>
 
         {error && <p className="mb-4 text-center text-sm text-primary">{error}</p>}
 

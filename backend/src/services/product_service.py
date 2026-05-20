@@ -106,6 +106,8 @@ class ContenidoService:
         self.contenido_repo = ContenidoRepository(db)
         self.genero_repo = GeneroRepository(db)
         self.perfil_repo = PerfilRepository(db)
+        self.vista_repo = VistaRepository(db)
+        self.calificacion_repo = CalificacionRepository(db)
         self.video_variant_repo = VideoVariantRepository(db)
 
     def create(self, dto: CreateContenidoDTO) -> ContenidoResponseDTO:
@@ -289,6 +291,49 @@ class ContenidoService:
     def top(self, genero: str | None = None) -> list[ContenidoResponseDTO]:
         contenidos = self.contenido_repo.top(limit=10, genero=genero)
         return to_contenido_response_list(contenidos)
+
+    def recomendaciones(self, perfil_id: int) -> list[ContenidoResponseDTO]:
+        """Recomienda catalogo por generos vistos/calificados, excluyendo lo ya empezado."""
+        perfil = self.perfil_repo.find_by_id(perfil_id)
+        if not perfil:
+            raise NotFoundError("Perfil no encontrado")
+
+        watched_ids: set[int] = set()
+        genre_scores: dict[int, int] = {}
+
+        for vista in self.vista_repo.list_by_perfil(perfil_id):
+            contenido = vista.contenido
+            if vista.episodio is not None:
+                contenido = vista.episodio.temporada.contenido
+            if not contenido:
+                continue
+            watched_ids.add(contenido.id)
+            weight = 2 if vista.terminado else 1
+            for genero in contenido.generos:
+                genre_scores[genero.id] = genre_scores.get(genero.id, 0) + weight
+
+        for calificacion in self.calificacion_repo.list_by_perfil(perfil_id):
+            watched_ids.add(calificacion.contenido_id)
+            for genero in calificacion.contenido.generos:
+                genre_scores[genero.id] = genre_scores.get(genero.id, 0) + calificacion.puntaje
+
+        contenidos = self.contenido_repo.search(
+            clasificacion_edad="ATP" if perfil.es_infantil else None,
+            ordenar="anio_desc",
+        )
+        candidatos = [contenido for contenido in contenidos if contenido.id not in watched_ids]
+
+        if genre_scores:
+            candidatos.sort(
+                key=lambda contenido: (
+                    sum(genre_scores.get(genero.id, 0) for genero in contenido.generos),
+                    contenido.anio,
+                    contenido.titulo,
+                ),
+                reverse=True,
+            )
+
+        return to_contenido_response_list(candidatos[:10])
 
     def get_video_source(self, contenido_id: int, quality: str | None = None) -> VideoSourceDTO:
         """Elige la variante pedida o la mejor disponible para reproducir."""
@@ -817,6 +862,16 @@ class CalificacionService:
             puntaje=dto.puntaje,
         )
         return to_calificacion_response(calif)
+
+    def get(self, perfil_id: int, contenido_id: int) -> CalificacionResponseDTO:
+        if not self.perfil_repo.find_by_id(perfil_id):
+            raise NotFoundError("Perfil no encontrado")
+        if not self.contenido_repo.find_by_id(contenido_id):
+            raise NotFoundError("Contenido no encontrado")
+        calificacion = self.calificacion_repo.find_by_perfil_and_contenido(perfil_id, contenido_id)
+        if not calificacion:
+            raise NotFoundError("Calificacion no encontrada")
+        return to_calificacion_response(calificacion)
 
     def create(self, dto: CreateCalificacionDTO) -> CalificacionResponseDTO:
         return self.create_or_update(dto)

@@ -184,10 +184,11 @@ export function ContentDetail({ content, onClose, onPlay }: ContentDetailProps) 
             <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
               {content.tipo === "pelicula" ? "Pelicula" : "Serie"}
             </span>
-            {content.promedio_calificacion !== undefined && content.promedio_calificacion > 0 && (
+            {(content.promedio_calificaciones ?? content.promedio_calificacion) !== undefined &&
+              (content.promedio_calificaciones ?? content.promedio_calificacion ?? 0) > 0 && (
               <span className="flex items-center gap-1 text-yellow-500">
                 <Star size={14} fill="currentColor" />
-                {content.promedio_calificacion.toFixed(1)}
+                {(content.promedio_calificaciones ?? content.promedio_calificacion ?? 0).toFixed(1)}
               </span>
             )}
           </div>

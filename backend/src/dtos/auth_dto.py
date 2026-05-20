@@ -20,6 +20,7 @@ class TokenDTO(BaseModel):
     id: int | None = None
     is_admin: bool = False
     email: str | None = None
+    plan: str | None = None
 
 
 class AuthAccountDTO(BaseModel):
@@ -41,3 +42,4 @@ class PerfilAuthResponseDTO(BaseModel):
     message: str
     perfil_id: int
     cuenta_id: int
+    bloqueado_hasta: str | None = None

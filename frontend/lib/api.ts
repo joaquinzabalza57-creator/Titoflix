@@ -151,6 +151,7 @@ export async function register(email: string, password: string, plan: "basico" |
 export type StoredAccount = {
   id?: number;
   email: string;
+  plan?: "basico" | "estandar" | "premium";
   is_admin: boolean;
 };
 
@@ -249,4 +250,59 @@ export async function reportarVista(perfilId: number, payload: ReportVistaPayloa
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export interface Calificacion {
+  id: number;
+  perfil_id: number;
+  contenido_id: number;
+  puntaje: number;
+}
+
+export async function setCalificacion(perfilId: number, contenidoId: number, puntaje: number): Promise<Calificacion> {
+  return apiRequest<Calificacion>(`/perfiles/${perfilId}/calificaciones/${contenidoId}`, {
+    method: "POST",
+    body: JSON.stringify({ puntaje }),
+  });
+}
+
+export async function getCalificacion(perfilId: number, contenidoId: number): Promise<Calificacion | null> {
+  try {
+    return await apiRequest<Calificacion>(`/perfiles/${perfilId}/calificaciones/${contenidoId}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteCalificacion(perfilId: number, contenidoId: number): Promise<void> {
+  await apiRequest(`/perfiles/${perfilId}/calificaciones/${contenidoId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getRecomendaciones(perfilId: number): Promise<import("@/lib/types").Contenido[]> {
+  return apiRequest<import("@/lib/types").Contenido[]>(`/perfiles/${perfilId}/recomendaciones`);
+}
+
+export async function downloadFromApi(path: string, fallbackFilename: string): Promise<void> {
+  const response = await fetch(getApiUrl(path), {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  const filename = match?.[1] || fallbackFilename;
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }

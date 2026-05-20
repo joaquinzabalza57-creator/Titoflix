@@ -3,10 +3,20 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Play, Plus, Check, Star, Loader2, Film, Tv } from "lucide-react";
-import { apiRequest, getSelectedProfile, getBackendUrl, getAssetUrl, reportarVista } from "@/lib/api";
+import { ArrowLeft, Play, Plus, Check, Star, Loader2, Film, Tv, Download, X } from "lucide-react";
+import {
+  apiRequest,
+  deleteCalificacion,
+  downloadFromApi,
+  getCalificacion,
+  getBackendUrl,
+  getAssetUrl,
+  reportarVista,
+  setCalificacion,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
+import { StarRating } from "@/components/StarRating";
 import type { Contenido, Temporada, Episodio, PlaybackResponse, VideoVariant, Profile, ContinuarViendoItem } from "@/lib/types";
 
 export default function ContentDetailPage() {
@@ -28,6 +38,9 @@ export default function ContentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentProfileData, setCurrentProfileData] = useState<Profile | null>(null);
   const [progressItems, setProgressItems] = useState<ContinuarViendoItem[]>([]);
+  const [rating, setRating] = useState(0);
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
 
   // Auth check
   useEffect(() => {
@@ -126,8 +139,19 @@ export default function ContentDetailPage() {
       .catch(() => setProgressItems([]));
   }, [content, profile]);
 
+  useEffect(() => {
+    if (!profile || !content) {
+      setRating(0);
+      return;
+    }
+    getCalificacion(profile.id, content.id)
+      .then((calificacion) => setRating(calificacion?.puntaje || 0))
+      .catch(() => setRating(0));
+  }, [content, profile]);
+
   const movieQualities = qualityOptions(content?.video_variants);
   const portadaUrl = content ? getAssetUrl(content.portada_url) : null;
+  const averageRating = content?.promedio_calificaciones ?? content?.promedio_calificacion ?? null;
 
   const movieProgress = progressItems.find((item) => !item.episodio && item.contenido.id === content?.id);
 
@@ -267,6 +291,76 @@ export default function ContentDetailPage() {
     }
   };
 
+  const handleRate = async (puntaje: number) => {
+    if (!profile || !content) return;
+    setRatingLoading(true);
+    setError(null);
+    try {
+      await setCalificacion(profile.id, content.id, puntaje);
+      setRating(puntaje);
+      setContent((current) =>
+        current
+          ? {
+              ...current,
+              promedio_calificaciones: current.promedio_calificaciones ?? current.promedio_calificacion ?? puntaje,
+            }
+          : current
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la calificacion");
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
+  const handleClearRating = async () => {
+    if (!profile || !content || rating === 0) return;
+    setRatingLoading(true);
+    setError(null);
+    try {
+      await deleteCalificacion(profile.id, content.id);
+      setRating(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo borrar la calificacion");
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
+  const handleDownloadMovie = async () => {
+    if (!content) return;
+    const quality = selectedMovieQuality || movieQualities[0] || "";
+    setDownloadLoading("movie");
+    setError(null);
+    try {
+      const path = quality
+        ? `/contenidos/${content.id}/download?quality=${encodeURIComponent(quality)}`
+        : `/contenidos/${content.id}/download`;
+      await downloadFromApi(path, safeVideoFilename(content.titulo));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descargar el video");
+    } finally {
+      setDownloadLoading(null);
+    }
+  };
+
+  const handleDownloadEpisode = async (episodio: Episodio) => {
+    const qualities = qualityOptions(episodio.video_variants);
+    const quality = selectedEpisodeQualities[episodio.id] || qualities[0] || "";
+    setDownloadLoading(`ep-${episodio.id}`);
+    setError(null);
+    try {
+      const path = quality
+        ? `/episodios/${episodio.id}/download?quality=${encodeURIComponent(quality)}`
+        : `/episodios/${episodio.id}/download`;
+      await downloadFromApi(path, safeVideoFilename(episodio.titulo));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descargar el episodio");
+    } finally {
+      setDownloadLoading(null);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -348,10 +442,10 @@ export default function ContentDetailPage() {
           <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
             {content.tipo === "pelicula" ? "Pelicula" : "Serie"}
           </span>
-          {content.promedio_calificacion !== undefined && content.promedio_calificacion > 0 && (
+          {averageRating !== null && averageRating > 0 && (
             <span className="flex items-center gap-1 text-yellow-500">
               <Star size={14} fill="currentColor" />
-              {content.promedio_calificacion.toFixed(1)}
+              {averageRating.toFixed(1)}
             </span>
           )}
         </div>
@@ -416,6 +510,14 @@ export default function ContentDetailPage() {
                   ))}
                 </select>
               )}
+              <button
+                onClick={handleDownloadMovie}
+                disabled={downloadLoading === "movie"}
+                className="flex items-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground font-semibold rounded-lg hover:bg-secondary/80 transition-colors border border-border disabled:opacity-50"
+              >
+                {downloadLoading === "movie" ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                Descargar
+              </button>
             </>
           )}
           <button
@@ -432,6 +534,23 @@ export default function ContentDetailPage() {
             )}
             {inMiLista ? "En Mi lista" : "Mi lista"}
           </button>
+        </div>
+
+        <div className="mb-8 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+          <span className="text-sm font-medium text-foreground">Tu calificacion</span>
+          <StarRating value={rating} onChange={handleRate} label="Calificar contenido" />
+          {ratingLoading && <Loader2 size={18} className="animate-spin text-primary" />}
+          {rating > 0 && (
+            <button
+              type="button"
+              onClick={handleClearRating}
+              disabled={ratingLoading}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+            >
+              <X size={14} />
+              Quitar
+            </button>
+          )}
         </div>
 
         {/* Series: Temporadas and Episodios */}
@@ -536,6 +655,18 @@ export default function ContentDetailPage() {
                           )}
                           {episodeProgress ? "Continuar" : "Ver"}
                         </button>
+                        <button
+                          onClick={() => handleDownloadEpisode(episodio)}
+                          disabled={downloadLoading === `ep-${episodio.id}`}
+                          className="flex h-10 flex-shrink-0 items-center gap-2 rounded-md border border-border bg-secondary px-3 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+                        >
+                          {downloadLoading === `ep-${episodio.id}` ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Download size={16} />
+                          )}
+                          Descargar
+                        </button>
                       </div>
                     </div>
                   );
@@ -565,4 +696,12 @@ function qualityOptions(variants: VideoVariant[] | undefined): string[] {
 
 function qualityRank(quality: string): number {
   return { FHD: 1, QHD: 2, "4K": 3 }[quality] || 0;
+}
+
+function safeVideoFilename(title: string): string {
+  const safeTitle = title
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${safeTitle || "titoflix-video"}.mp4`;
 }

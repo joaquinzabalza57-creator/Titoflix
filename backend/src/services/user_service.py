@@ -119,6 +119,8 @@ class PerfilService:
         repeated_name = any(perfil.nombre == dto.nombre for perfil in perfiles)
         if repeated_name:
             raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
+        if dto.es_infantil and dto.pin:
+            raise ConflictError("Los perfiles infantiles no pueden tener PIN")
 
         perfil = self.perfil_repo.create(
             cuenta_id=dto.cuenta_id,
@@ -170,8 +172,17 @@ class PerfilService:
             if repeated_name:
                 raise ConflictError("Ya existe un perfil con ese nombre en la cuenta")
 
+        if fields.get("es_infantil") is True:
+            fields["pin"] = None
+            fields["pin_failed_attempts"] = 0
+            fields["pin_locked_until"] = None
+        elif perfil_actual.es_infantil and fields.get("pin"):
+            raise ConflictError("Los perfiles infantiles no pueden tener PIN")
+
         if "pin" in fields:
             fields["pin"] = hash_password(fields["pin"]) if fields["pin"] else None
+            fields["pin_failed_attempts"] = 0
+            fields["pin_locked_until"] = None
 
         if "avatar" in fields:
             avatar = fields["avatar"]

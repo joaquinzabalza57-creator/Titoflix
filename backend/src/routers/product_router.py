@@ -540,6 +540,15 @@ def continuar_viendo(
     return VistaService(db).continuar_viendo(profile.id)
 
 
+@router.get("/perfiles/{perfil_id}/recomendaciones", response_model=list[ContenidoResponseDTO])
+def recomendaciones(
+    perfil_id: int,
+    profile: Perfil = Depends(get_owned_profile),
+    db: Session = Depends(get_db),
+):
+    return ContenidoService(db).recomendaciones(profile.id)
+
+
 @router.post("/perfiles/{perfil_id}/mi-lista", response_model=list[ContenidoResponseDTO])
 def add_to_mi_lista(
     perfil_id: int,
@@ -568,6 +577,19 @@ def remove_from_mi_lista(
     db: Session = Depends(get_db),
 ):
     return MiListaService(db).remove(profile.id, contenido_id)
+
+
+@router.get(
+    "/perfiles/{perfil_id}/calificaciones/{contenido_id}",
+    response_model=CalificacionResponseDTO,
+)
+def get_calificacion(
+    perfil_id: int,
+    contenido_id: int,
+    profile: Perfil = Depends(get_owned_profile),
+    db: Session = Depends(get_db),
+):
+    return CalificacionService(db).get(profile.id, contenido_id)
 
 
 @router.post(

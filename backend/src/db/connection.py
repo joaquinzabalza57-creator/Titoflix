@@ -24,10 +24,12 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     # Migraciones livianas para bases locales antiguas sin incorporar Alembic.
     ensure_account_admin_column()
+    ensure_profile_pin_lock_columns()
     ensure_storage_media_columns()
     ensure_asset_media_columns()
     ensure_duration_columns_are_float()
     ensure_video_variant_quality_values()
+    ensure_child_profiles_have_no_pin()
     ensure_default_admin_account()
     print("Tablas creadas exitosamente")
 
@@ -46,6 +48,27 @@ def ensure_account_admin_column():
         connection.execute(
             text("ALTER TABLE cuentas ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE")
         )
+
+
+def ensure_profile_pin_lock_columns():
+    """Agrega estado persistido para bloqueo de PIN en perfiles existentes."""
+    inspector = inspect(engine)
+    if not inspector.has_table("perfiles"):
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("perfiles")}
+    statements = []
+    if "pin_failed_attempts" not in column_names:
+        statements.append("ALTER TABLE perfiles ADD COLUMN pin_failed_attempts INTEGER NOT NULL DEFAULT 0")
+    if "pin_locked_until" not in column_names:
+        statements.append("ALTER TABLE perfiles ADD COLUMN pin_locked_until TIMESTAMP")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def ensure_storage_media_columns():
@@ -170,6 +193,22 @@ def ensure_video_variant_quality_values():
                 "CHECK (quality IN ('FHD', 'QHD', '4K'))"
             )
         )
+
+
+def ensure_child_profiles_have_no_pin():
+    """Asegura que los perfiles infantiles existentes no queden protegidos por PIN."""
+    inspector = inspect(engine)
+    if not inspector.has_table("perfiles"):
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("perfiles")}
+    if not {"es_infantil", "pin"}.issubset(column_names):
+        return
+
+    reset_attempts = ", pin_failed_attempts = 0" if "pin_failed_attempts" in column_names else ""
+    reset_locked = ", pin_locked_until = NULL" if "pin_locked_until" in column_names else ""
+    with engine.begin() as connection:
+        connection.execute(text(f"UPDATE perfiles SET pin = NULL{reset_attempts}{reset_locked} WHERE es_infantil = TRUE"))
 
 
 def ensure_default_admin_account():

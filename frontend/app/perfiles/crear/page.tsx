@@ -65,6 +65,10 @@ export default function CreateProfilePage() {
       setError("El PIN debe tener 4 digitos");
       return;
     }
+    if (esInfantil && cleanPin) {
+      setError("Los perfiles infantiles no pueden tener PIN");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -72,7 +76,7 @@ export default function CreateProfilePage() {
         method: "POST",
         body: JSON.stringify({
           nombre: cleanName,
-          pin: cleanPin || null,
+          pin: esInfantil ? null : cleanPin || null,
           avatar,
           es_infantil: esInfantil,
         }),
@@ -158,16 +162,21 @@ export default function CreateProfilePage() {
           placeholder="4 digitos"
           inputMode="numeric"
           maxLength={4}
-          disabled={loading}
+          disabled={loading || esInfantil}
         />
-        <p className="mb-4 text-xs text-muted-foreground">Dejalo vacio si no queres proteger este perfil.</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          {esInfantil ? "Los perfiles infantiles no usan PIN." : "Dejalo vacio si no queres proteger este perfil."}
+        </p>
 
         <div className="mb-5 flex items-center gap-3">
           <input
             id="es-infantil"
             type="checkbox"
             checked={esInfantil}
-            onChange={(e) => setEsInfantil(e.target.checked)}
+            onChange={(e) => {
+              setEsInfantil(e.target.checked);
+              if (e.target.checked) setPin("");
+            }}
             className="h-5 w-5 rounded border-border bg-secondary text-primary focus:ring-primary"
             disabled={loading}
           />

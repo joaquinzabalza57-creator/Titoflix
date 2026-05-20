@@ -81,6 +81,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       setStoredAccount({
         id: response.id,
         email: response.email || email,
+        plan: response.plan,
         is_admin: Boolean(response.is_admin),
       });
       onLoginSuccess({ admin: Boolean(response.is_admin) });
@@ -140,6 +141,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       setStoredAccount({
         id: response.id,
         email: response.email || "admin",
+        plan: response.plan,
         is_admin: Boolean(response.is_admin),
       });
       onLoginSuccess({ admin: true });

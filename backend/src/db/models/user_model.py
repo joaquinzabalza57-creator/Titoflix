@@ -33,6 +33,8 @@ class Perfil(Base):
     cuenta_id = Column(Integer, ForeignKey("cuentas.id"), nullable=False)
     nombre = Column(String, nullable=False)
     pin = Column(String, nullable=True)  # Si existe, tambien se guarda hasheado.
+    pin_failed_attempts = Column(Integer, default=0, nullable=False)
+    pin_locked_until = Column(DateTime, nullable=True)
     es_infantil = Column(Boolean, default=False)
     avatar = Column(String, nullable=True)  # Object key o URL de imagen.
 

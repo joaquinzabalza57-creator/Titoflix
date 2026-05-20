@@ -25,6 +25,13 @@ class UnauthorizedError(AppError):
     message = "Unauthorized"
 
 
+class LockedError(AppError):
+    """Recurso temporalmente bloqueado por seguridad."""
+
+    status_code = 423
+    message = "Locked"
+
+
 class ForbiddenError(AppError):
     """El usuario esta autenticado, pero no tiene permisos para la accion."""
 
